@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AssignmentRules xmlns="http://soap.sforce.com/2006/04/metadata">
+    <assignmentRule>
+        <fullName>VE Case Routing</fullName>
+        <active>true</active>
+        <ruleEntry>
+            <assignedTo>VE_Technical_Support</assignedTo>
+            <assignedToType>Queue</assignedToType>
+            <criteriaItems>
+                <field>Case.Priority</field>
+                <operation>equals</operation>
+                <value>High</value>
+            </criteriaItems>
+        </ruleEntry>
+        <ruleEntry>
+            <assignedTo>VE_L1_Support</assignedTo>
+            <assignedToType>Queue</assignedToType>
+            <formula>true</formula>
+        </ruleEntry>
+    </assignmentRule>
+</AssignmentRules>
