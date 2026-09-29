@@ -270,6 +270,10 @@
         <recordType>Asset.Charging_Station</recordType>
         <visible>true</visible>
     </recordTypeVisibilities>
+    <servicePresenceStatusAccesses>
+        <enabled>true</enabled>
+        <servicePresenceStatus>Available_for_Cases</servicePresenceStatus>
+    </servicePresenceStatusAccesses>
     <tabSettings>
         <tab>Charging_Site__c</tab>
         <visibility>Visible</visibility>
