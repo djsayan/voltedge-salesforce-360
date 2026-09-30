@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Loss_Reason__c</fullName>
+    <label>Loss Reason</label>
+    <required>false</required>
+    <trackFeedHistory>false</trackFeedHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Price</fullName>
+                <default>false</default>
+                <label>Price</label>
+            </value>
+            <value>
+                <fullName>Competitor</fullName>
+                <default>false</default>
+                <label>Competitor</label>
+            </value>
+            <value>
+                <fullName>Budget Cancelled</fullName>
+                <default>false</default>
+                <label>Budget Cancelled</label>
+            </value>
+            <value>
+                <fullName>Project Delayed</fullName>
+                <default>false</default>
+                <label>Project Delayed</label>
+            </value>
+            <value>
+                <fullName>No Decision</fullName>
+                <default>false</default>
+                <label>No Decision</label>
+            </value>
+            <value>
+                <fullName>Technical Fit</fullName>
+                <default>false</default>
+                <label>Technical Fit</label>
+            </value>
+            <value>
+                <fullName>Other</fullName>
+                <default>false</default>
+                <label>Other</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

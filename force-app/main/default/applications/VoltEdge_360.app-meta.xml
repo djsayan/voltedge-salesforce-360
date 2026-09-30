@@ -24,6 +24,7 @@
     <tabs>standard-Case</tabs>
     <tabs>standard-report</tabs>
     <tabs>standard-Dashboard</tabs>
+    <tabs>Installation_Project__c</tabs>
     <uiType>Lightning</uiType>
     <utilityBar>VoltEdge_360_UtilityBar</utilityBar>
 </CustomApplication>
