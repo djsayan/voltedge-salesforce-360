@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>VE_Closed_Lost_Requires_Reason</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(
+    RecordType.DeveloperName = &quot;EV_Charging_Deal&quot;,
+    ISPICKVAL(StageName, &quot;Closed Lost&quot;),
+    ISPICKVAL(Loss_Reason__c, &quot;&quot;)
+)</errorConditionFormula>
+    <errorMessage>Select a Loss Reason before closing this EV charging deal as Lost.</errorMessage>
+</ValidationRule>
