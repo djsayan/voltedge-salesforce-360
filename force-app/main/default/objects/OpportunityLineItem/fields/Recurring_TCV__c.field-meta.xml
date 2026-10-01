@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Recurring_TCV__c</fullName>
+    <formula>CASE(
+    TEXT(Revenue_Type__c),
+    &quot;Monthly Recurring&quot;,
+        TotalPrice * BLANKVALUE(Term_Months__c, 0),
+
+    &quot;Annual Recurring&quot;,
+        TotalPrice * (BLANKVALUE(Term_Months__c, 0) / 12),
+
+    0
+)</formula>
+    <formulaTreatBlanksAs>BlankAsZero</formulaTreatBlanksAs>
+    <label>Recurring TCV</label>
+    <precision>18</precision>
+    <required>false</required>
+    <scale>2</scale>
+    <type>Currency</type>
+</CustomField>

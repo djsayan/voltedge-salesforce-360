@@ -63,10 +63,6 @@
         </layoutColumns>
         <layoutColumns>
             <layoutItems>
-                <behavior>Edit</behavior>
-                <field>Amount</field>
-            </layoutItems>
-            <layoutItems>
                 <behavior>Readonly</behavior>
                 <field>ExpectedRevenue</field>
             </layoutItems>
@@ -178,6 +174,44 @@
         <layoutColumns/>
         <layoutColumns/>
         <style>CustomLinks</style>
+    </layoutSections>
+    <layoutSections>
+        <customLabel>true</customLabel>
+        <detailHeading>true</detailHeading>
+        <editHeading>true</editHeading>
+        <label>Commercial Metrics</label>
+        <layoutColumns>
+            <layoutItems>
+                <behavior>Edit</behavior>
+                <field>Amount</field>
+            </layoutItems>
+            <layoutItems>
+                <behavior>Edit</behavior>
+                <field>One_Time_Revenue__c</field>
+            </layoutItems>
+            <layoutItems>
+                <behavior>Edit</behavior>
+                <field>MRR__c</field>
+            </layoutItems>
+            <layoutItems>
+                <behavior>Edit</behavior>
+                <field>ARR__c</field>
+            </layoutItems>
+            <layoutItems>
+                <behavior>Edit</behavior>
+                <field>Recurring_TCV__c</field>
+            </layoutItems>
+            <layoutItems>
+                <behavior>Edit</behavior>
+                <field>Total_Contract_Value__c</field>
+            </layoutItems>
+            <layoutItems>
+                <behavior>Required</behavior>
+                <field>CurrencyIsoCode</field>
+            </layoutItems>
+        </layoutColumns>
+        <layoutColumns/>
+        <style>TwoColumnsLeftToRight</style>
     </layoutSections>
     <platformActionList>
         <actionListContext>Record</actionListContext>
@@ -382,6 +416,16 @@
         <fields>Status__c</fields>
         <fields>Target_Go_Live_Date__c</fields>
         <relatedList>Installation_Project__c.Opportunity__c</relatedList>
+    </relatedLists>
+    <relatedLists>
+        <fields>QUOTE.QUOTENUMBER</fields>
+        <fields>QUOTE.NAME</fields>
+        <fields>QUOTE.ISSYNCING</fields>
+        <fields>QUOTE.EXPIRATIONDATE</fields>
+        <fields>QUOTE.SUBTOTAL</fields>
+        <fields>QUOTE.TOTALPRICE</fields>
+        <fields>CreatedBy</fields>
+        <relatedList>RelatedQuoteList</relatedList>
     </relatedLists>
     <relatedObjects>AccountId</relatedObjects>
     <showEmailCheckbox>false</showEmailCheckbox>
