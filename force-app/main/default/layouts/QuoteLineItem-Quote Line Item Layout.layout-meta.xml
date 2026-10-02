@@ -34,6 +34,10 @@
                 <behavior>Edit</behavior>
                 <field>Discount_Reason__c</field>
             </layoutItems>
+            <layoutItems>
+                <behavior>Readonly</behavior>
+                <field>Effective_Discount__c</field>
+            </layoutItems>
         </layoutColumns>
         <layoutColumns>
             <layoutItems>

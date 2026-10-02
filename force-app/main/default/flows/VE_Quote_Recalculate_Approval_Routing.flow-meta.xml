@@ -3,6 +3,22 @@
     <apiVersion>67.0</apiVersion>
     <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
     <assignments>
+        <name>Reset_Quote_to_Draft</name>
+        <label>Reset Quote to Draft</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignmentItems>
+            <assignToReference>$Record.Status</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Draft</stringValue>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Get_Opportunity</targetReference>
+        </connector>
+    </assignments>
+    <assignments>
         <name>Set_Commercial_Director_Approval</name>
         <label>Set Commercial Director Approval</label>
         <locationX>0</locationX>
@@ -70,7 +86,7 @@
         <defaultConnectorLabel>Default Outcome</defaultConnectorLabel>
         <rules>
             <name>Recalculate</name>
-            <conditionLogic>1</conditionLogic>
+            <conditionLogic>1 OR (2 AND 3) OR 4</conditionLogic>
             <conditions>
                 <leftValueReference>$Record.Maximum_Line_Discount__c</leftValueReference>
                 <operator>NotEqualTo</operator>
@@ -78,10 +94,56 @@
                     <elementReference>$Record__Prior.Maximum_Line_Discount__c</elementReference>
                 </rightValue>
             </conditions>
+            <conditions>
+                <leftValueReference>$Record.Status</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <stringValue>Needs Review</stringValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>$Record__Prior.Status</leftValueReference>
+                <operator>NotEqualTo</operator>
+                <rightValue>
+                    <stringValue>Needs Review</stringValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>$Record.Commercial_Revision__c</leftValueReference>
+                <operator>NotEqualTo</operator>
+                <rightValue>
+                    <elementReference>$Record__Prior.Commercial_Revision__c</elementReference>
+                </rightValue>
+            </conditions>
             <connector>
-                <targetReference>Get_Opportunity</targetReference>
+                <targetReference>Commercial_Terms_Changed</targetReference>
             </connector>
             <label>Recalculate</label>
+        </rules>
+    </decisions>
+    <decisions>
+        <name>Commercial_Terms_Changed</name>
+        <label>Commercial Terms Changed?</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <defaultConnector>
+            <targetReference>Get_Opportunity</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Default Outcome</defaultConnectorLabel>
+        <rules>
+            <name>Changed</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>$Record.Commercial_Revision__c</leftValueReference>
+                <operator>NotEqualTo</operator>
+                <rightValue>
+                    <elementReference>$Record__Prior.Commercial_Revision__c</elementReference>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Reset_Quote_to_Draft</targetReference>
+            </connector>
+            <label>Changed</label>
         </rules>
     </decisions>
     <decisions>

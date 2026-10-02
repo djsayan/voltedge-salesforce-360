@@ -1,47 +1,73 @@
+/** Recalculates Quote metrics in system context, including all child lines. */
 public without sharing class VEQuoteDiscountRollupService {
-
+    // Compatibility entry point: a metrics refresh is not a commercial edit.
     public static void recalculate(Set<Id> quoteIds) {
+        recalculate(quoteIds, new Set<Id>());
+    }
+
+    public static void recalculate(
+        Set<Id> quoteIds,
+        Set<Id> commerciallyChangedQuoteIds
+    ) {
         if (quoteIds == null || quoteIds.isEmpty()) {
             return;
         }
 
-        Map<Id, Decimal> maxDiscountByQuote = new Map<Id, Decimal>();
+        // Read the revision while holding a parent lock to avoid lost increments.
+        List<Quote> quotes = [
+            SELECT Id, Maximum_Line_Discount__c, Commercial_Revision__c
+            FROM Quote
+            WHERE Id IN :quoteIds
+            FOR UPDATE
+        ];
+        if (quotes.isEmpty()) {
+            return;
+        }
 
-        // Seed every Quote with zero.
-        // Important when the last discounted line is deleted.
-        for (Id quoteId : quoteIds) {
-            maxDiscountByQuote.put(quoteId, 0);
+        Map<Id, Decimal> maxDiscountByQuote = new Map<Id, Decimal>();
+        for (Quote quoteRecord : quotes) {
+            maxDiscountByQuote.put(quoteRecord.Id, 0);
         }
 
         for (AggregateResult result : [
-            SELECT
-                QuoteId quoteId,
-                MAX(Discount) maxDiscount
-            FROM QuoteLineItem
-            WHERE QuoteId IN :quoteIds
-            GROUP BY QuoteId
+        SELECT QuoteId, MAX(Effective_Discount__c) maxDiscount
+        FROM QuoteLineItem
+        WHERE QuoteId IN :quoteIds
+        GROUP BY QuoteId
         ]) {
-            Id quoteId = (Id) result.get('quoteId');
             Decimal maxDiscount = (Decimal) result.get('maxDiscount');
-
             maxDiscountByQuote.put(
-                quoteId,
+                (Id) result.get('quoteId'),
                 maxDiscount == null ? 0 : maxDiscount
             );
         }
 
         List<Quote> quotesToUpdate = new List<Quote>();
+        for (Quote quoteRecord : quotes) {
+            Decimal maxDiscount = maxDiscountByQuote.get(quoteRecord.Id);
+            Boolean commercialChange = commerciallyChangedQuoteIds != null &&
+                commerciallyChangedQuoteIds.contains(quoteRecord.Id);
 
-        for (Id quoteId : maxDiscountByQuote.keySet()) {
-            quotesToUpdate.add(
-                new Quote(
-                    Id = quoteId,
-                    Maximum_Line_Discount__c =
-                        maxDiscountByQuote.get(quoteId)
-                )
+            if (
+                !commercialChange &&
+                quoteRecord.Maximum_Line_Discount__c == maxDiscount
+            ) {
+                continue;
+            }
+
+            Quote updateRecord = new Quote(
+                Id = quoteRecord.Id,
+                Maximum_Line_Discount__c = maxDiscount
             );
+            if (commercialChange) {
+                Decimal currentRevision = quoteRecord.Commercial_Revision__c;
+                updateRecord.Commercial_Revision__c =
+                    (currentRevision == null ? 0 : currentRevision) + 1;
+            }
+            quotesToUpdate.add(updateRecord);
         }
 
+        // The Quote before-save Flow owns status reset and approver routing.
         if (!quotesToUpdate.isEmpty()) {
             update quotesToUpdate;
         }
