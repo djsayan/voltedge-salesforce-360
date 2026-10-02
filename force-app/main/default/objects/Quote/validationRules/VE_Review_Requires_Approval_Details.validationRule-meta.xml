@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>VE_Review_Requires_Approval_Details</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(
+    ISPICKVAL(Status, &quot;Needs Review&quot;),
+    Approval_Required__c,
+    OR(
+        ISBLANK(Discount_Justification__c),
+        ISBLANK(Discount_Approver__c)
+    )
+)</errorConditionFormula>
+    <errorMessage>Discount approval requires both a justification and an assigned approver.</errorMessage>
+</ValidationRule>

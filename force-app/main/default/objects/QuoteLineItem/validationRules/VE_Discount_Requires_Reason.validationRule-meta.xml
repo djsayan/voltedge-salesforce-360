@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>VE_Discount_Requires_Reason</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(
+    Discount &gt; 0,
+    ISPICKVAL(Discount_Reason__c, &quot;&quot;)
+)</errorConditionFormula>
+    <errorMessage>Select a Discount Reason when a discount is applied.</errorMessage>
+</ValidationRule>
