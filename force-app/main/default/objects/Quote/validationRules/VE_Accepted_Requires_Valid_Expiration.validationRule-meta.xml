@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>VE_Accepted_Requires_Valid_Expiration</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(
+    ISPICKVAL(Status, &quot;Accepted&quot;),
+    OR(
+        ISBLANK(ExpirationDate),
+        ExpirationDate &lt; TODAY()
+    )
+)</errorConditionFormula>
+    <errorMessage>An accepted quote must have a valid, non-expired Expiration Date.</errorMessage>
+</ValidationRule>
