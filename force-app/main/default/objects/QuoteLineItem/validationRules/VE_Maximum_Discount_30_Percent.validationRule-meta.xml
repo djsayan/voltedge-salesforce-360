@@ -2,6 +2,6 @@
 <ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>VE_Maximum_Discount_30_Percent</fullName>
     <active>true</active>
-    <errorConditionFormula>Discount  &gt; 0.30</errorConditionFormula>
+    <errorConditionFormula>Effective_Discount__c  &gt; 0.30</errorConditionFormula>
     <errorMessage>Discounts above 30% are not permitted.</errorMessage>
 </ValidationRule>

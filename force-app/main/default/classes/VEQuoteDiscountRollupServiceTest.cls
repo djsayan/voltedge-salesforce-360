@@ -14,11 +14,6 @@ private class VEQuoteDiscountRollupServiceTest {
 
         Id standardPricebookId = Test.getStandardPricebookId();
 
-        update new Pricebook2(
-            Id = standardPricebookId,
-            IsActive = true
-        );
-
         insert new PricebookEntry(
             Pricebook2Id = standardPricebookId,
             Product2Id = product.Id,
