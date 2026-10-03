@@ -8,11 +8,18 @@ trigger VEQuoteLineItemTrigger on QuoteLineItem (
     after undelete
 ) {
     if (Trigger.isBefore) {
-        VEQuoteLineItemHandler.validateEditable(
-            Trigger.isDelete ? Trigger.old : Trigger.new,
+    VEQuoteLineItemHandler.validateEditable(
+        Trigger.isDelete ? Trigger.old : Trigger.new,
+        Trigger.isUpdate ? Trigger.oldMap : null
+    );
+
+    if (Trigger.isInsert || Trigger.isUpdate) {
+        VEQuoteLineItemHandler.captureApprovalBasisPrice(
+            Trigger.new,
             Trigger.isUpdate ? Trigger.oldMap : null
         );
-    } else {
+    }
+} else {
         // Salesforce has no before-undelete trigger event.
         if (Trigger.isUndelete) {
             VEQuoteLineItemHandler.validateEditable(Trigger.new, null);

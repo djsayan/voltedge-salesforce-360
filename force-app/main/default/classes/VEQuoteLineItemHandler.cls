@@ -95,4 +95,91 @@ public without sharing class VEQuoteLineItemHandler {
         }
         return quoteIds;
     }
+
+public static void captureApprovalBasisPrice(
+    List<QuoteLineItem> lines,
+    Map<Id, QuoteLineItem> oldMap
+) {
+    if (lines == null || lines.isEmpty()) {
+        return;
+    }
+
+    Set<Id> pricebookEntryIds = new Set<Id>();
+    Set<Id> linesNeedingSnapshot = new Set<Id>();
+
+    for (QuoteLineItem line : lines) {
+        if (line.PricebookEntryId == null) {
+            continue;
+        }
+
+        QuoteLineItem oldLine =
+            oldMap == null ? null : oldMap.get(line.Id);
+
+        Boolean isInsert = oldLine == null;
+
+        Boolean pricebookEntryChanged =
+            oldLine != null &&
+            line.PricebookEntryId != oldLine.PricebookEntryId;
+
+        Boolean missingBasis =
+            line.Approval_Basis_Unit_Price__c == null;
+
+        if (
+            isInsert ||
+            pricebookEntryChanged ||
+            missingBasis
+        ) {
+            pricebookEntryIds.add(line.PricebookEntryId);
+
+            if (line.Id != null) {
+                linesNeedingSnapshot.add(line.Id);
+            }
+        }
+    }
+
+    if (pricebookEntryIds.isEmpty()) {
+        return;
+    }
+
+    Map<Id, PricebookEntry> entriesById =
+        new Map<Id, PricebookEntry>([
+            SELECT Id, UnitPrice
+            FROM PricebookEntry
+            WHERE Id IN :pricebookEntryIds
+        ]);
+
+    for (QuoteLineItem line : lines) {
+        if (line.PricebookEntryId == null) {
+            continue;
+        }
+
+        QuoteLineItem oldLine =
+            oldMap == null ? null : oldMap.get(line.Id);
+
+        Boolean isInsert = oldLine == null;
+
+        Boolean pricebookEntryChanged =
+            oldLine != null &&
+            line.PricebookEntryId != oldLine.PricebookEntryId;
+
+        Boolean missingBasis =
+            line.Approval_Basis_Unit_Price__c == null;
+
+        if (
+            !isInsert &&
+            !pricebookEntryChanged &&
+            !missingBasis
+        ) {
+            continue;
+        }
+
+        PricebookEntry entry =
+            entriesById.get(line.PricebookEntryId);
+
+        if (entry != null) {
+            line.Approval_Basis_Unit_Price__c =
+                entry.UnitPrice;
+        }
+    }
+}
 }

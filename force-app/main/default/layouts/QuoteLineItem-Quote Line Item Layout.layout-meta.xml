@@ -38,6 +38,10 @@
                 <behavior>Readonly</behavior>
                 <field>Effective_Discount__c</field>
             </layoutItems>
+            <layoutItems>
+                <behavior>Edit</behavior>
+                <field>Approval_Basis_Unit_Price__c</field>
+            </layoutItems>
         </layoutColumns>
         <layoutColumns>
             <layoutItems>
