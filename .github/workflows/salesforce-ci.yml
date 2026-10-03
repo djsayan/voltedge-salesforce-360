@@ -1,0 +1,200 @@
+name: Salesforce CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: salesforce-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scratch-validation:
+    name: Fresh Scratch Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      SF_CLI_VERSION: 2.153.5
+      SCRATCH_ALIAS: ve-ci-${{ github.run_id }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli@${SF_CLI_VERSION}
+
+      - name: Verify Salesforce CLI
+        run: sf --version
+
+      - name: Authenticate Dev Hub
+        env:
+          SFDX_AUTH_URL: ${{ secrets.SFDX_AUTH_URL }}
+        run: |
+          printf '%s' "$SFDX_AUTH_URL" |
+            sf org login sfdx-url \
+              --sfdx-url-stdin \
+              --alias ci-devhub \
+              --set-default-dev-hub
+
+      - name: Create fresh scratch org
+        run: |
+          sf org create scratch \
+            --definition-file config/project-scratch-def.json \
+            --alias "$SCRATCH_ALIAS" \
+            --duration-days 1 \
+            --target-dev-hub ci-devhub \
+            --wait 20
+
+      - name: Bootstrap Omni-Channel routing
+        run: |
+          sf project deploy start \
+            --source-dir force-app/main/default/queueRoutingConfigs \
+            --target-org "$SCRATCH_ALIAS" \
+            --wait 15
+
+      - name: Bootstrap Case queues
+        run: |
+          sf project deploy start \
+            --source-dir force-app/main/default/queues \
+            --target-org "$SCRATCH_ALIAS" \
+            --wait 15
+
+      - name: Deploy complete Salesforce source
+        run: |
+          sf project deploy start \
+            --source-dir force-app \
+            --target-org "$SCRATCH_ALIAS" \
+            --test-level NoTestRun \
+            --wait 30
+
+      - name: Configure EUR currency
+        run: |
+          sf data create record \
+            --sobject CurrencyType \
+            --values "IsoCode=EUR ConversionRate=1 DecimalPlaces=2 IsActive=true" \
+            --target-org "$SCRATCH_ALIAS"
+
+      - name: Configure PLN currency
+        run: |
+          sf data create record \
+            --sobject CurrencyType \
+            --values "IsoCode=PLN ConversionRate=1 DecimalPlaces=2 IsActive=true" \
+            --target-org "$SCRATCH_ALIAS"
+
+      - name: Run Apex regression suite
+        shell: bash
+        run: |
+          set +e
+
+          sf apex run test \
+            --target-org "$SCRATCH_ALIAS" \
+            --test-level RunLocalTests \
+            --code-coverage \
+            --wait 30 \
+            --json > apex-test-result.json
+
+          TEST_EXIT=$?
+
+          set -e
+
+          if [ ! -s apex-test-result.json ]; then
+            echo "::error::Salesforce CLI did not produce Apex test results."
+            exit 1
+          fi
+
+          node <<'NODE'
+          const fs = require('fs');
+
+          let data;
+
+          try {
+            data = JSON.parse(
+              fs.readFileSync('apex-test-result.json', 'utf8')
+            );
+          } catch (error) {
+            console.error('Unable to parse Apex test result JSON.');
+            process.exit(1);
+          }
+
+          const summary = data.result?.summary;
+
+          if (!summary) {
+            console.error('Apex test summary was not returned.');
+            process.exit(1);
+          }
+
+          const coverage = Number(
+            String(summary.orgWideCoverage ?? '0')
+              .replace('%', '')
+          );
+
+          console.log('');
+          console.log('=== Apex CI Summary ===');
+          console.log(`Outcome: ${summary.outcome}`);
+          console.log(`Tests Ran: ${summary.testsRan}`);
+          console.log(`Pass Rate: ${summary.passRate}`);
+          console.log(`Fail Rate: ${summary.failRate}`);
+          console.log(
+            `Org Wide Coverage: ${summary.orgWideCoverage}`
+          );
+          console.log('');
+
+          if (summary.outcome !== 'Passed') {
+            console.error('Apex regression suite failed.');
+            process.exit(1);
+          }
+
+          if (!Number.isFinite(coverage)) {
+            console.error('Unable to determine Apex coverage.');
+            process.exit(1);
+          }
+
+          if (coverage < 90) {
+            console.error(
+              `Coverage gate failed: ${coverage}% < 90%.`
+            );
+            process.exit(1);
+          }
+
+          console.log(
+            `Coverage gate passed: ${coverage}% >= 90%.`
+          );
+          NODE
+
+          if [ "$TEST_EXIT" -ne 0 ]; then
+            echo "::error::Salesforce CLI returned exit code $TEST_EXIT."
+            exit "$TEST_EXIT"
+          fi
+
+      - name: Upload Apex test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-test-result-${{ github.run_id }}
+          path: apex-test-result.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Delete scratch org
+        if: always()
+        run: |
+          sf org delete scratch \
+            --target-org "$SCRATCH_ALIAS" \
+            --no-prompt || true
