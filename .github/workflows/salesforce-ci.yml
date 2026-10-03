@@ -76,13 +76,85 @@ jobs:
             --target-org "$SCRATCH_ALIAS" \
             --wait 15
 
-      - name: Deploy complete Salesforce source
+            - name: Deploy complete Salesforce source
+        shell: bash
         run: |
+          set -o pipefail
+
+          DEPLOY_LOG="$(mktemp)"
+
+          set +e
+
           sf project deploy start \
             --source-dir force-app \
             --target-org "$SCRATCH_ALIAS" \
             --test-level NoTestRun \
-            --wait 30
+            --wait 30 \
+            2>&1 | tee "$DEPLOY_LOG"
+
+          DEPLOY_EXIT=${PIPESTATUS[0]}
+
+          set -e
+
+          if [ "$DEPLOY_EXIT" -eq 0 ]; then
+            echo "Metadata deployment completed successfully."
+            exit 0
+          fi
+
+          echo "Initial deploy command exited with code $DEPLOY_EXIT."
+
+          if grep -Eiq \
+            "MetadataTransferError|fetch failed|ECONNRESET|ETIMEDOUT|socket hang up|502|503|504" \
+            "$DEPLOY_LOG"; then
+
+            echo "Transient Salesforce Metadata API error detected."
+
+            DEPLOY_ID=$(
+              grep -Eo '0Af[A-Za-z0-9]+' "$DEPLOY_LOG" |
+              tail -n 1
+            )
+
+            if [ -z "$DEPLOY_ID" ]; then
+              echo "::error::Transient error detected, but Deploy ID could not be recovered."
+              exit "$DEPLOY_EXIT"
+            fi
+
+            echo "Recovered Deploy ID: $DEPLOY_ID"
+            echo "Checking the existing deployment instead of starting a duplicate."
+
+            for ATTEMPT in 1 2 3; do
+              echo "Deploy status attempt $ATTEMPT of 3..."
+
+              set +e
+
+              sf project deploy report \
+                --job-id "$DEPLOY_ID" \
+                --target-org "$SCRATCH_ALIAS" \
+                --wait 10
+
+              REPORT_EXIT=$?
+
+              set -e
+
+              if [ "$REPORT_EXIT" -eq 0 ]; then
+                echo "Existing deployment completed successfully."
+                exit 0
+              fi
+
+              if [ "$ATTEMPT" -lt 3 ]; then
+                SLEEP_SECONDS=$((ATTEMPT * 10))
+
+                echo "Status check failed. Waiting ${SLEEP_SECONDS}s before retry..."
+                sleep "$SLEEP_SECONDS"
+              fi
+            done
+
+            echo "::error::Deployment did not complete successfully after retrying status checks."
+            exit 1
+          fi
+
+          echo "::error::Deployment failed with a non-transient Salesforce error."
+          exit "$DEPLOY_EXIT"
 
       - name: Configure EUR currency
         run: |
