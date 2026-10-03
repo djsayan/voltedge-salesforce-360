@@ -1,58 +1,1005 @@
-# Salesforce DX Project
+# VoltEdge 360
 
-Salesforce DX is a development approach that brings source-driven development, team collaboration, and continuous integration to the Salesforce Platform. Instead of working directly in an org through a web browser, you work with metadata as source files in a local DX project, track changes in version control, and deploy through automated processes.
+**Enterprise-style Salesforce implementation for an EV charging infrastructure company.**
 
-This project template gets you started with the tools and structure you need to build Salesforce applications using source control, scratch orgs, and the Salesforce CLI.
+VoltEdge 360 is a portfolio and reference implementation designed to demonstrate how Salesforce can support the full commercial and operational lifecycle of an EV charging business — from sales and quoting through approval governance, implementation delivery, asset management, and customer support.
+
+The project is built using source-driven Salesforce development practices with Git, Salesforce DX, scratch orgs, automated Apex testing, and GitHub Actions CI.
+
+---
+
+## Project Status
+
+| Area | Status |
+| --- | --- |
+| Core CRM & EV charging data model | Implemented |
+| Sales Cloud | Implemented |
+| Service Cloud | Implemented |
+| Quote-to-Cash foundation | Implemented |
+| Discount governance & approval lifecycle | Implemented |
+| Revenue calculations | Implemented |
+| Delivery / installation tracking | Implemented |
+| Security personas | Implemented |
+| Reports & dashboards | Implemented |
+| Fresh scratch-org deployment | Implemented |
+| GitHub Actions CI | Implemented |
+| Advanced CPQ / Revenue Cloud | Roadmap |
+| Data Cloud | Roadmap |
+| Marketing automation | Roadmap |
+| AI / Agentforce | Roadmap |
+
+---
+
+## Business Scenario
+
+VoltEdge is a fictional EV charging infrastructure provider.
+
+Its Salesforce implementation needs to support several connected business processes:
+
+- manage B2B customers and their charging locations
+- track deployed charging stations as Assets
+- manage EV infrastructure sales opportunities
+- configure commercial products and pricing
+- calculate recurring and one-time revenue
+- prepare customer Quotes
+- control commercial discounts
+- route high-discount Quotes for approval
+- prevent approved commercial terms from being changed silently
+- convert won deals into installation projects
+- support deployed charging infrastructure through Service Cloud
+- provide reporting for sales and delivery teams
+
+The goal of the project is not to create a minimal demo org, but to model the kinds of governance, automation, security, testing, and deployment concerns found in a real Salesforce implementation.
+
+---
+
+# Architecture
+
+## Core Domain Model
+
+```mermaid
+flowchart LR
+    A[Account] --> CS[Charging Site]
+    CS --> AS[Asset / Charging Station]
+
+    A --> O[Opportunity]
+    O --> OLI[Opportunity Products]
+    O --> Q[Quote]
+    Q --> QLI[Quote Line Items]
+
+    O --> IP[Installation Project]
+
+    A --> C[Case]
+    AS --> C
+```
+
+### Main business entities
+
+**Account**
+
+Represents a VoltEdge customer.
+
+**Charging Site**
+
+Represents a physical customer location where EV charging infrastructure is deployed.
+
+Relationship:
+
+```text
+Account
+  └── Charging Site
+        └── Asset / Charging Station
+```
+
+**Asset**
+
+Represents an installed charging station.
+
+Assets are linked both to the customer Account and the correct Charging Site.
+
+**Opportunity**
+
+Represents the commercial sales process.
+
+**Opportunity Product**
+
+Represents products sold as part of the deal and drives revenue calculations.
+
+**Quote / Quote Line Item**
+
+Represents customer-facing commercial terms and the governed discount approval process.
+
+**Installation Project**
+
+Created from a Closed Won Opportunity and represents delivery of the sold infrastructure.
+
+**Case**
+
+Represents post-sale customer support and is routed through Service Cloud queues and Omni-Channel.
+
+---
+
+# Sales Cloud
+
+VoltEdge uses a dedicated sales process for EV charging infrastructure.
+
+## EV Charging Opportunity
+
+Custom Opportunity fields include:
+
+- Deal Type
+- Number of Sites
+- Number of Chargers
+- Solution Type
+- Target Go-Live Date
+- Requires Site Survey
+- Loss Reason
+
+A dedicated Opportunity record type and business process are used for EV charging deals.
+
+Business validation ensures that important commercial information is present at the appropriate stages of the sales process.
+
+Closed Lost opportunities require a loss reason.
+
+---
+
+# Product & Revenue Model
+
+VoltEdge uses Salesforce Products and Price Books as the commercial catalog.
+
+The implementation supports multiple revenue models, including:
+
+- one-time hardware revenue
+- monthly recurring revenue
+- annual recurring revenue
+
+Opportunity-level revenue metrics include:
+
+| Metric | Purpose |
+| --- | --- |
+| One-Time Revenue | Non-recurring hardware / implementation revenue |
+| MRR | Monthly Recurring Revenue |
+| ARR | Annual Recurring Revenue |
+| Recurring TCV | Total recurring contract value |
+| Total Contract Value | Combined commercial value |
+
+Revenue totals are recalculated automatically from Opportunity Products.
+
+The rollup service supports:
+
+- insert
+- update
+- delete
+- undelete
+- multiple Opportunities in the same transaction
+- multiple currencies
+
+---
+
+# Multi-Currency
+
+The project is designed for multi-currency operation.
+
+Current reference currencies:
+
+```text
+PLN
+EUR
+USD
+```
+
+The CI environment creates PLN and EUR as technical test currencies.
+
+The conversion rates used during automated CI validation are deliberately neutral technical fixtures and are **not intended to represent real production FX rates**.
+
+---
+
+# Quote-to-Cash Foundation
+
+Quotes are connected to Opportunities and use Salesforce Products and Price Books.
+
+The implementation adds enterprise-style governance around commercial terms rather than allowing unrestricted Quote Line editing.
+
+Key capabilities include:
+
+- automatic Quote expiration defaults
+- discount reason requirements
+- effective discount calculation
+- maximum Quote discount rollup
+- approval routing
+- commercial revision tracking
+- approval invalidation after commercial changes
+- Quote Line locking during approval
+- strict maximum discount enforcement
+
+---
+
+# Pricing Integrity
+
+A central design goal is to prevent approval rules from being bypassed by manipulating both `UnitPrice` and `Discount`.
+
+Each Quote Line stores an immutable commercial pricing baseline:
+
+```text
+Approval_Basis_Unit_Price__c
+```
+
+When the line is first created, the current Price Book Entry unit price is captured as the approval basis.
+
+Effective discount is calculated against that frozen baseline rather than against the current Price Book Entry.
+
+Conceptually:
+
+```text
+Effective Discount =
+1 - Net Sales Price / Approval Basis Unit Price
+```
+
+where:
+
+```text
+Net Sales Price =
+UnitPrice × (1 - Discount)
+```
+
+This means both of the following are treated as commercial discount:
+
+```text
+List Price: 1,000
+Sales Price: 850
+Discount field: 0%
+```
+
+and:
+
+```text
+List Price: 1,000
+Sales Price: 1,000
+Discount field: 15%
+```
+
+Both represent an effective 15% discount.
+
+The approval basis is intentionally frozen so that later Price Book changes cannot silently alter the approval history of an existing Quote.
+
+---
+
+# Discount Governance
+
+VoltEdge uses the following commercial policy:
+
+| Effective Discount | Approval |
+| ---: | --- |
+| 0% – 10% | No approval |
+| >10% – 20% | Sales Manager |
+| >20% – 30% | Commercial Director |
+| >30% | Blocked |
+
+Exactly:
+
+```text
+30.000%
+```
+
+is allowed.
+
+Anything above the maximum, including:
+
+```text
+30.001%
+```
+
+is rejected.
+
+Any effective commercial discount also requires a Discount Reason.
+
+---
+
+# Approval Routing
+
+Approval routing is hierarchy-based.
+
+For a Quote owned by a Sales Rep:
+
+```text
+Sales Rep
+   │
+   ├── Manager
+   │     └── approves >10% to 20%
+   │
+   └── Manager's Manager
+         └── approves >20% to 30%
+```
+
+The approval process uses the real Salesforce approval engine.
+
+The implementation verifies scenarios including:
+
+- approval by Sales Manager
+- approval by Commercial Director
+- rejection
+- recall
+- resubmission
+- missing manager
+- inactive manager
+- exact approval thresholds
+
+A Quote cannot move into review when the required approver is unavailable.
+
+---
+
+# Commercial Revision Control
+
+Approved Quotes must not silently change after approval.
+
+VoltEdge therefore tracks:
+
+```text
+Commercial_Revision__c
+```
+
+Commercially meaningful Quote Line changes invalidate the current approval state.
+
+Examples include changes to:
+
+- Product
+- approval pricing basis
+- Quantity
+- Unit Price
+- Discount
+- Discount Reason
+- Service Date
+
+When commercial terms change:
+
+```text
+Approved Quote
+      │
+      ▼
+Commercial change detected
+      │
+      ▼
+Approval invalidated
+      │
+      ▼
+Quote returned to Draft
+      │
+      ▼
+Commercial Revision incremented
+      │
+      ▼
+New approval required
+```
+
+Non-commercial changes such as an internal Description update do not invalidate approval.
+
+---
+
+# Approval Locking
+
+While a Quote is in the approval process, its Quote Lines are protected from modification.
+
+The system blocks commercial writes when either approval indicator shows that the Quote is under review.
+
+This protection covers:
+
+- insert
+- update
+- delete
+- undelete
+
+This prevents users or integrations from changing the commercial basis while an approver is reviewing the Quote.
+
+---
+
+# Delivery Automation
+
+When an eligible Opportunity reaches Closed Won, Salesforce creates an Installation Project.
+
+The project carries important delivery context from the Opportunity, including:
+
+- customer
+- number of sites
+- number of chargers
+- solution type
+- target go-live date
+
+This creates a clear handoff between:
+
+```text
+Sales
+  ↓
+Closed Won
+  ↓
+Installation Project
+  ↓
+Operations / Delivery
+```
+
+---
+
+# Service Cloud
+
+The implementation includes a Service Cloud foundation for supporting deployed EV charging infrastructure.
+
+Capabilities include:
+
+- Case management
+- L1 Support queue
+- Technical Support queue
+- assignment rules
+- Omni-Channel
+- routing configurations
+- presence configuration
+- Case-to-Asset relationship
+- customer and charging-station support context
+
+Example flow:
+
+```text
+Customer Case
+     │
+     ▼
+Assignment Rules
+     │
+     ▼
+Support Queue
+     │
+     ▼
+Omni-Channel
+     │
+     ▼
+Available Service Agent
+```
+
+---
+
+# Data Integrity
+
+The implementation contains additional controls designed to protect the EV charging data model.
+
+For example, a Charging Site cannot simply be reassigned to another customer Account when charging Assets are already associated with that location.
+
+This prevents data such as:
+
+```text
+Customer A
+   └── Site
+         └── Chargers
+```
+
+from accidentally becoming:
+
+```text
+Customer B
+   └── Site
+         └── Chargers still belonging to Customer A
+```
+
+without an explicit migration process.
+
+Asset configuration also uses lookup filtering to ensure that the selected Charging Site belongs to the same Account.
+
+---
+
+# Security Model
+
+VoltEdge uses permission sets to represent business personas.
+
+| Permission Set | Persona |
+| --- | --- |
+| `VE_Sales_User` | Sales users |
+| `VE_Service_User` | Service agents |
+| `VE_Operations_User` | Delivery / operations |
+| `VE_Commercial_Approver` | Commercial approvers |
+
+The security model separates editable commercial data from calculated or system-controlled fields.
+
+Examples of protected information include:
+
+- effective discount
+- approval pricing basis
+- revenue calculations
+- approval routing fields
+- commercial revision
+- system-generated delivery information
+
+The intent is to enforce business rules through both Salesforce security and application logic rather than relying only on UI configuration.
+
+---
+
+# Automation
+
+VoltEdge uses a combination of declarative automation and Apex.
+
+| Automation | Technology | Purpose |
+| --- | --- | --- |
+| Prevent Charging Site Account change | Flow | Protect Account / Site / Asset integrity |
+| Installation Project creation | Flow | Sales-to-delivery handoff |
+| Quote expiration default | Flow | Default commercial validity period |
+| Quote approval routing | Flow | Calculate approval requirement and approver |
+| Quote Line commercial governance | Apex Trigger / Handler | Detect pricing and commercial changes |
+| Quote discount rollup | Apex | Calculate maximum effective discount |
+| Opportunity revenue rollup | Apex | Calculate revenue metrics |
+| Discount approval | Salesforce Approval Process | Govern high-discount Quotes |
+| Case routing | Service Cloud / Omni-Channel | Route support work |
+
+---
+
+# Apex Architecture
+
+Commercial logic is separated into focused services rather than being implemented directly inside triggers.
+
+Important components include:
+
+```text
+VEQuoteLineItemTrigger
+        │
+        ▼
+VEQuoteLineItemHandler
+        │
+        ├── Pricing basis capture
+        ├── Approval write protection
+        ├── Commercial change detection
+        │
+        └── Rollup coordination
+                │
+                ▼
+VEQuoteDiscountRollupService
+```
+
+Revenue calculations are handled independently by:
+
+```text
+VEOpportunityRevenueRollupService
+```
+
+This keeps trigger responsibilities small and makes business logic directly testable.
+
+---
+
+# API 67 Data Access Hardening
+
+The project explicitly distinguishes between:
+
+- real user-context business operations
+- internal system automation
+- technical test fixtures
+
+Internal automation that must enforce governance regardless of field-level security uses explicit system-mode data access where appropriate.
+
+Lifecycle tests that represent real Sales users and approvers continue to execute under their business personas.
+
+This keeps security testing meaningful while avoiding accidental dependency on administrator-level test execution.
+
+---
+
+# Testing Strategy
+
+The Apex test suite covers both unit-level behavior and multi-step business lifecycle scenarios.
+
+Current fresh-org result:
+
+```text
+Tests Ran:         36
+Pass Rate:         100%
+Fail Rate:         0%
+Org Wide Coverage: 94%
+```
+
+The test suite includes scenarios for:
+
+- revenue calculations
+- multiple currencies
+- bulk Opportunity Product processing
+- Quote discount rollups
+- effective pricing calculations
+- exact 30% discount boundary
+- discount reason enforcement
+- immutable approval basis
+- bulk Quote Line processing
+- partial transaction success
+- approval locking
+- commercial revision invalidation
+- approval submission
+- manager approval
+- commercial director approval
+- rejection
+- recall
+- resubmission
+- missing manager
+- inactive manager
+
+Bulk-oriented tests include scenarios such as processing 200 Quote Lines across multiple Quotes.
+
+---
+
+# Continuous Integration
+
+The repository contains a GitHub Actions workflow:
+
+```text
+.github/workflows/salesforce-ci.yml
+```
+
+Every pull request to `main` is validated against a fresh Salesforce scratch org.
+
+The CI pipeline performs:
+
+```text
+Checkout repository
+        ↓
+Install Salesforce CLI
+        ↓
+Authenticate Dev Hub
+        ↓
+Create fresh scratch org
+        ↓
+Bootstrap Omni-Channel routing
+        ↓
+Bootstrap Case queues
+        ↓
+Deploy complete Salesforce source
+        ↓
+Configure CI currencies
+        ↓
+Run RunLocalTests
+        ↓
+Validate Apex coverage
+        ↓
+Upload test artifact
+        ↓
+Delete scratch org
+```
+
+The pipeline enforces:
+
+```text
+All Apex tests must pass
+AND
+Org-wide Apex coverage must be >= 90%
+```
+
+Scratch org deletion runs even when an earlier CI step fails.
+
+This ensures that successful development does not depend on configuration that exists only in a developer's local Salesforce org.
+
+---
+
+# Fresh Scratch Org Deployment
 
 ## Prerequisites
 
-Before you start, make sure you have:
+Required tools:
 
-- **Salesforce CLI** - Download from [developer.salesforce.com/tools/salesforcecli](https://developer.salesforce.com/tools/salesforcecli). See [Install Salesforce CLI](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_install_cli.htm) for details.
-- **VS Code with Salesforce Extension Pack** - See [Installation Instructions](https://developer.salesforce.com/docs/platform/sfvscode-extensions/guide/install.html) for details. Includes the Agentforce Vibes extension.
-- **A development org** - Sign up for a free Developer Edition org [here](https://developer.salesforce.com/signup).
-- **Dev Hub enabled** (optional, required to create scratch orgs) - You can enable Dev Hub in your development org under Setup > Dev Hub.  See [Provide Developers Access to Salesforce DX Tools](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_setup_dx_tools.htm).
+```text
+Git
+Node.js
+Salesforce CLI
+A Salesforce Dev Hub
+```
 
-## Project Structure
+Authenticate a Dev Hub:
 
-Your DX project follows this structure:
+```bash
+sf org login web \
+  --alias voltedge-dev \
+  --set-default-dev-hub
+```
 
-- **`force-app/main/default/`** - Your metadata source files live in this default package directory. You can configure additional package directories in the `sfdx-project.json` file.
-- **`config/`** - Scratch org definitions and project settings
-- **`scripts/`** - Automation scripts for common tasks
-- **`sfdx-project.json`** - Project manifest that defines package directories, namespace, API version, and other project-level settings
+Create a scratch org:
 
-See [Salesforce DX Project Configuration](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_ws_config.htm).
+```bash
+sf org create scratch \
+  --definition-file config/project-scratch-def.json \
+  --alias voltedge-scratch \
+  --duration-days 1 \
+  --target-dev-hub voltedge-dev \
+  --wait 20
+```
 
-## Get Started
+The scratch definition enables the platform capabilities required by the project, including Quotes, multi-currency, Service Cloud, Omni-Channel, and Translation Workbench.
 
-Ready to start developing? The [Get Started with Salesforce DX](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_get_started_dx.htm) guide walks you through your first project, from creating a scratch org to creating a simple Apex class or LWC to deploying your code to a sandbox.
+---
 
-## Common Salesforce CLI Commands
+## Metadata Deployment Order
 
-Here are common CLI commands that you'll use the most:
+Service Cloud queue metadata has a deployment dependency on its routing configuration.
 
-- `sf org login web`: Authorize an org
-- `sf org open`: Open your org in a browser
-- `sf org create scratch`: Create a scratch org
-- `sf project deploy start`: Deploy metadata to your org
-- `sf project retrieve start`: Retrieve metadata from your org
-- `sf template generate <artifact>`: Scaffold new components, such as Apex classes and triggers, LWC components, Lightning apps, and more
-- `sf apex <command>`: Run Apex tests, run anonymous Apex blocks, and view logs
-- `sf data <command>`: Work with test data
-- `sf alias <command>`: Manage org aliases
-- `sf config <command>`: Configure CLI settings
+Deploy routing configuration first:
 
-## Use Agentforce Vibes to Build Lightning Apps
+```bash
+sf project deploy start \
+  --source-dir force-app/main/default/queueRoutingConfigs \
+  --target-org voltedge-scratch \
+  --wait 15
+```
 
-Transform your ideas into custom Lightning apps that extend CRM workflows directly in Lightning Experience. Through natural conversations with Agentforce Vibes, implement custom objects and fields, complex business logic, and dynamic UI components. See [Build a Lightning App Using Agentforce Vibes](https://developer.salesforce.com/docs/platform/einstein-for-devs/guide/lexapp-overview.html).
+Then deploy queues:
 
-## Additional Resources
+```bash
+sf project deploy start \
+  --source-dir force-app/main/default/queues \
+  --target-org voltedge-scratch \
+  --wait 15
+```
 
-- [Agentforce Vibes Developer Guide](https://developer.salesforce.com/docs/platform/einstein-for-devs/guide/einstein-overview.html)
-- [Salesforce CLI Installation Guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_intro.htm)
-- [Salesforce DX Developer Guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/)
-- [Salesforce CLI Command Reference](https://developer.salesforce.com/docs/atlas.en-us.sfdx_cli_reference.meta/sfdx_cli_reference/)
-- [Salesforce CLI Plugin Development Guide](https://developer.salesforce.com/docs/platform/salesforce-cli-plugin/guide/conceptual-overview.html)
-- [Salesforce VS Code Extensions Documentation](https://developer.salesforce.com/tools/vscode/)
+Then deploy the full application:
 
+```bash
+sf project deploy start \
+  --source-dir force-app \
+  --target-org voltedge-scratch \
+  --test-level NoTestRun \
+  --wait 30
+```
+
+---
+
+## Configure Development Currencies
+
+Example technical setup:
+
+```bash
+sf data create record \
+  --sobject CurrencyType \
+  --values "IsoCode=EUR ConversionRate=1 DecimalPlaces=2 IsActive=true" \
+  --target-org voltedge-scratch
+```
+
+```bash
+sf data create record \
+  --sobject CurrencyType \
+  --values "IsoCode=PLN ConversionRate=1 DecimalPlaces=2 IsActive=true" \
+  --target-org voltedge-scratch
+```
+
+These rates are development fixtures only.
+
+---
+
+## Run Apex Regression
+
+```bash
+sf apex run test \
+  --target-org voltedge-scratch \
+  --test-level RunLocalTests \
+  --code-coverage \
+  --result-format human \
+  --wait 30
+```
+
+Expected baseline for the current implementation:
+
+```text
+36 tests
+100% pass rate
+94% org-wide Apex coverage
+```
+
+---
+
+# Repository Structure
+
+```text
+voltedge-salesforce-360/
+│
+├── .github/
+│   └── workflows/
+│       └── salesforce-ci.yml
+│
+├── config/
+│   └── project-scratch-def.json
+│
+├── force-app/
+│   └── main/
+│       └── default/
+│           ├── applications/
+│           ├── approvalProcesses/
+│           ├── assignmentRules/
+│           ├── classes/
+│           ├── dashboards/
+│           ├── flows/
+│           ├── layouts/
+│           ├── objects/
+│           ├── permissionsets/
+│           ├── queues/
+│           ├── queueRoutingConfigs/
+│           ├── reports/
+│           └── triggers/
+│
+├── scripts/
+├── README.md
+└── sfdx-project.json
+```
+
+---
+
+# Demo Scenarios
+
+The implementation can be demonstrated through several end-to-end business scenarios.
+
+## 1. EV Infrastructure Sale
+
+```text
+Account
+→ Opportunity
+→ Products
+→ Revenue metrics
+→ Quote
+```
+
+Demonstrates Sales Cloud, Products, Price Books, multi-currency, and revenue calculations.
+
+## 2. Standard Discount
+
+Create a Quote Line with an effective discount of 8%.
+
+Expected result:
+
+```text
+Approval Required: No
+```
+
+## 3. Sales Manager Approval
+
+Create a Quote with an effective discount of 15%.
+
+Expected result:
+
+```text
+Approval Required: Yes
+Approval Level: Sales Manager
+Approver: Opportunity Owner's Manager
+```
+
+## 4. Commercial Director Approval
+
+Create a Quote with an effective discount of 25%.
+
+Expected result:
+
+```text
+Approval Required: Yes
+Approval Level: Commercial Director
+```
+
+## 5. Discount Guardrail
+
+Attempt an effective discount above 30%.
+
+Expected result:
+
+```text
+Save blocked
+```
+
+## 6. Commercial Change After Approval
+
+Approve a Quote and then change its Unit Price.
+
+Expected result:
+
+```text
+Approved
+→ commercial change
+→ Draft
+→ revision increment
+→ approval required again
+```
+
+## 7. Service Case
+
+Create a Case for a deployed charging station.
+
+Demonstrates:
+
+```text
+Case
+→ Assignment Rules
+→ Queue
+→ Omni-Channel
+→ Service Agent
+```
+
+## 8. Closed Won Delivery
+
+Close an eligible Opportunity as Won.
+
+Expected result:
+
+```text
+Installation Project created automatically
+```
+
+---
+
+# Design Decisions
+
+## Explicit pricing baseline
+
+Approval decisions are based on a frozen Quote Line pricing baseline instead of the current Price Book price.
+
+This preserves the historical commercial context of the approval.
+
+## Maximum effective discount
+
+Approval routing uses the maximum effective discount across Quote Lines rather than only the visible Salesforce Discount field.
+
+This prevents alternative price-entry techniques from bypassing commercial governance.
+
+## Approval invalidation
+
+A previously approved Quote is not considered permanently approved.
+
+Commercially meaningful changes invalidate the decision and require review again.
+
+## System automation vs user permissions
+
+System-owned calculations execute with the access needed to maintain integrity.
+
+Real business lifecycle tests continue to execute as Sales and approval personas.
+
+## Portable scratch configuration
+
+The project uses an explicit scratch-org definition instead of depending on the configuration of one source org.
+
+This improves portability and CI reproducibility.
+
+## Deployment dependency bootstrap
+
+Queue routing configuration and queues are deployed before the complete source package because of their Salesforce metadata dependency.
+
+This dependency is encoded directly in CI rather than being left as undocumented manual knowledge.
+
+---
+
+# Roadmap
+
+Future iterations are intended to extend VoltEdge 360 into additional Salesforce platform capabilities.
+
+Potential areas include:
+
+```text
+Revenue Cloud / advanced CPQ
+Data Cloud
+Marketing automation
+Agentforce / AI
+MuleSoft integrations
+Customer self-service
+Advanced installation scheduling
+Telemetry / charging-station integrations
+Predictive service
+Advanced commercial analytics
+```
+
+The current repository intentionally focuses first on a strong CRM, quoting, approval, service, security, testing, and deployment foundation.
+
+---
+
+# Engineering Principles
+
+VoltEdge 360 is developed around several principles:
+
+```text
+Source-driven development
+Business rules over demo shortcuts
+Least-privilege security
+Bulk-safe Apex
+Explicit commercial governance
+Automated regression testing
+Reproducible environments
+CI validation on fresh orgs
+Clear separation of responsibilities
+Production-oriented design decisions
+```
+
+---
+
+# Disclaimer
+
+VoltEdge 360 is a portfolio and reference implementation.
+
+VoltEdge is a fictional company and the repository contains no real customer or production data.
+
+The project is intended to demonstrate Salesforce architecture, administration, automation, Apex development, security design, testing, source control, and CI/CD practices.

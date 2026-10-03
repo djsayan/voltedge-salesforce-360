@@ -13,7 +13,7 @@ public without sharing class VEOpportunityRevenueRollupService {
             totalsByOpportunity.put(opportunityId, new RevenueTotals());
         }
 
-        for (OpportunityLineItem line : [
+            for (OpportunityLineItem line : [
             SELECT
                 OpportunityId,
                 CurrencyIsoCode,
@@ -24,6 +24,7 @@ public without sharing class VEOpportunityRevenueRollupService {
                 Line_TCV__c
             FROM OpportunityLineItem
             WHERE OpportunityId IN :opportunityIds
+            WITH SYSTEM_MODE
         ]) {
             RevenueTotals totals = totalsByOpportunity.get(line.OpportunityId);
 
@@ -49,9 +50,9 @@ public without sharing class VEOpportunityRevenueRollupService {
             ));
         }
 
-        if (!opportunitiesToUpdate.isEmpty()) {
-            update opportunitiesToUpdate;
-        }
+            if (!opportunitiesToUpdate.isEmpty()) {
+        update as system opportunitiesToUpdate;
+    }
     }
 
     private static Decimal valueOrZero(Decimal value) {

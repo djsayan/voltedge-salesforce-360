@@ -18,10 +18,11 @@ public without sharing class VEQuoteLineItemHandler {
 
         // Lock parents before checking their state; keep the lock through DML.
         Map<Id, Quote> quotes = new Map<Id, Quote>([
-            SELECT Id, Status, Approval_Status__c
-            FROM Quote
-            WHERE Id IN :quoteIds
-            FOR UPDATE
+        SELECT Id, Status, Approval_Status__c
+        FROM Quote
+        WHERE Id IN :quoteIds
+        WITH SYSTEM_MODE
+        FOR UPDATE
         ]);
 
         for (QuoteLineItem line : lines) {
@@ -147,11 +148,12 @@ public static void captureApprovalBasisPrice(
     }
 
     Map<Id, PricebookEntry> entriesById =
-        new Map<Id, PricebookEntry>([
-            SELECT Id, UnitPrice
-            FROM PricebookEntry
-            WHERE Id IN :pricebookEntryIds
-        ]);
+    new Map<Id, PricebookEntry>([
+        SELECT Id, UnitPrice
+        FROM PricebookEntry
+        WHERE Id IN :pricebookEntryIds
+        WITH SYSTEM_MODE
+    ]);
 
     for (QuoteLineItem line : lines) {
         if (line.PricebookEntryId == null) {

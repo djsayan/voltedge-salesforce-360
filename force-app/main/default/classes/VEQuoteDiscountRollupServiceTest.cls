@@ -10,11 +10,11 @@ private class VEQuoteDiscountRollupServiceTest {
             Revenue_Type__c = 'One-Time'
         );
 
-        insert product;
+        insert as system product;
 
         Id standardPricebookId = Test.getStandardPricebookId();
 
-        insert new PricebookEntry(
+            insert as system new PricebookEntry(
             Pricebook2Id = standardPricebookId,
             Product2Id = product.Id,
             UnitPrice = 1000,
@@ -54,7 +54,7 @@ private class VEQuoteDiscountRollupServiceTest {
         };
 
         Test.startTest();
-        insert lines;
+        insert as system lines;
         Test.stopTest();
 
         Quote actual = getQuoteMetrics(quote.Id);
@@ -101,7 +101,7 @@ private class VEQuoteDiscountRollupServiceTest {
                 25
             );
 
-        insert new List<QuoteLineItem>{
+        insert as system new List<QuoteLineItem>{
             line12,
             line25
         };
@@ -116,7 +116,7 @@ private class VEQuoteDiscountRollupServiceTest {
             );
 
         Test.startTest();
-        update lineToUpdate;
+        update as system lineToUpdate;
         Test.stopTest();
 
         Quote afterUpdate = getQuoteMetrics(quote.Id);
@@ -137,7 +137,7 @@ private class VEQuoteDiscountRollupServiceTest {
         );
 
         // Remove the 12% line.
-        delete new QuoteLineItem(
+        delete as system new QuoteLineItem(
             Id = line12.Id
         );
 
@@ -160,7 +160,7 @@ private class VEQuoteDiscountRollupServiceTest {
         );
 
         // Remove the last remaining line.
-        delete new QuoteLineItem(
+        delete as system new QuoteLineItem(
             Id = line25.Id
         );
 
@@ -223,7 +223,7 @@ private class VEQuoteDiscountRollupServiceTest {
             };
 
         Test.startTest();
-        insert lines;
+        insert as system lines;
         Test.stopTest();
 
         Quote actualA = getQuoteMetrics(quoteA.Id);
@@ -273,7 +273,7 @@ private class VEQuoteDiscountRollupServiceTest {
             CurrencyIsoCode = 'PLN'
         );
 
-        insert opp;
+        insert as system opp;
 
         Quote quote = new Quote(
             Name = quoteName,
@@ -283,7 +283,7 @@ private class VEQuoteDiscountRollupServiceTest {
             ExpirationDate = Date.today().addDays(30)
         );
 
-        insert quote;
+        insert as system quote;
 
         return quote;
     }
@@ -315,6 +315,7 @@ private class VEQuoteDiscountRollupServiceTest {
                 Pricebook2Id = :Test.getStandardPricebookId()
                 AND Product2.ProductCode = 'TEST-QUOTE-PRODUCT'
                 AND CurrencyIsoCode = 'PLN'
+                WITH SYSTEM_MODE
             LIMIT 1
         ];
     }
@@ -328,6 +329,7 @@ private class VEQuoteDiscountRollupServiceTest {
                 Discount_Approval_Level__c
             FROM Quote
             WHERE Id = :quoteId
+            WITH SYSTEM_MODE
         ];
     }
 }

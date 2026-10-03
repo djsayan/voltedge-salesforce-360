@@ -26,11 +26,11 @@ private class VEOpportunityRevenueRollupServiceTest {
             )
         };
 
-        insert products;
+        insert as system products;
 
         Id standardPricebookId = Test.getStandardPricebookId();
 
-        update new Pricebook2(
+            update as system new Pricebook2(
             Id = standardPricebookId,
             IsActive = true
         );
@@ -89,7 +89,7 @@ private class VEOpportunityRevenueRollupServiceTest {
             )
         };
 
-        insert entries;
+        insert as system entries;
     }
 
     @IsTest
@@ -131,7 +131,7 @@ private class VEOpportunityRevenueRollupServiceTest {
             };
 
         Test.startTest();
-        insert lines;
+        insert as system lines;
         Test.stopTest();
 
         Opportunity actual = getOpportunityMetrics(opp.Id);
@@ -185,7 +185,7 @@ private class VEOpportunityRevenueRollupServiceTest {
                 UnitPrice = monthlyPbe.UnitPrice
             );
 
-        insert line;
+        insert as system line;
 
         // Change quantity: 10 -> 20.
         // Use a clean SObject stub so API 67 doesn't try to update
@@ -198,7 +198,7 @@ private class VEOpportunityRevenueRollupServiceTest {
         );
 
         Test.startTest();
-        update lineToUpdate;
+        update as system lineToUpdate;
         Test.stopTest();
 
         Opportunity afterUpdate =
@@ -225,7 +225,7 @@ private class VEOpportunityRevenueRollupServiceTest {
         );
 
         // Delete last line.
-        delete new OpportunityLineItem(
+        delete as system new OpportunityLineItem(
         Id = line.Id
         );
 
@@ -333,7 +333,7 @@ private class VEOpportunityRevenueRollupServiceTest {
             };
 
         Test.startTest();
-        insert lines;
+        insert as system lines;
         Test.stopTest();
 
         Opportunity plnActual =
@@ -421,7 +421,7 @@ private class VEOpportunityRevenueRollupServiceTest {
             CurrencyIsoCode = currencyIsoCode
         );
 
-        insert opp;
+        insert as system opp;
 
         return opp;
     }
@@ -441,6 +441,7 @@ private class VEOpportunityRevenueRollupServiceTest {
                 Pricebook2Id = :Test.getStandardPricebookId()
                 AND Product2.ProductCode = :productCode
                 AND CurrencyIsoCode = :currencyIsoCode
+                WITH SYSTEM_MODE
             LIMIT 1
         ];
     }
@@ -459,6 +460,7 @@ private class VEOpportunityRevenueRollupServiceTest {
                 Total_Contract_Value__c
             FROM Opportunity
             WHERE Id = :opportunityId
+            WITH SYSTEM_MODE
         ];
     }
 }

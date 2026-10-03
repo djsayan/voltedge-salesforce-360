@@ -9,11 +9,11 @@ private class VEQuotePricingIntegrityTest {
         IsActive = true,
         Revenue_Type__c = 'One-Time'
     );
-    insert product;
+    insert as system product;
 
     // Standard price is required before a product can be
     // added to a custom Price Book.
-    insert new PricebookEntry(
+    insert as system new PricebookEntry(
         Pricebook2Id = Test.getStandardPricebookId(),
         Product2Id = product.Id,
         UnitPrice = 1000,
@@ -25,9 +25,9 @@ private class VEQuotePricingIntegrityTest {
         Name = 'VE Pricing Integrity Test Price Book',
         IsActive = true
     );
-    insert testPricebook;
+    insert as system testPricebook;
 
-    insert new PricebookEntry(
+    insert as system new PricebookEntry(
         Pricebook2Id = testPricebook.Id,
         Product2Id = product.Id,
         UnitPrice = 1000,
@@ -50,7 +50,7 @@ private class VEQuotePricingIntegrityTest {
             Discount_Reason__c = 'Other'
         );
 
-        insert line;
+        insert as system line;
 
         line = [
             SELECT
@@ -59,6 +59,7 @@ private class VEQuotePricingIntegrityTest {
                 PricebookEntry.UnitPrice
             FROM QuoteLineItem
             WHERE Id = :line.Id
+            WITH SYSTEM_MODE
         ];
 
         System.assertEquals(
@@ -85,6 +86,7 @@ private class VEQuotePricingIntegrityTest {
                 PricebookEntry.UnitPrice
             FROM QuoteLineItem
             WHERE Id = :line.Id
+            WITH SYSTEM_MODE
         ];
 
         System.assertEquals(
@@ -121,8 +123,9 @@ private class VEQuotePricingIntegrityTest {
                 UnitPrice = 800,
                 Discount = 0
             ),
-            false
-        );
+            false,
+            AccessLevel.SYSTEM_MODE
+);
 
         System.assertEquals(false, withoutReason.isSuccess());
         assertErrorContains(
@@ -156,7 +159,8 @@ private class VEQuotePricingIntegrityTest {
                 Discount = 0,
                 Discount_Reason__c = 'Other'
             ),
-            false
+            false,
+            AccessLevel.SYSTEM_MODE
         );
 
         System.assertEquals(
@@ -184,7 +188,8 @@ private class VEQuotePricingIntegrityTest {
                 Discount = 0,
                 Discount_Reason__c = 'Other'
             ),
-            false
+            false,
+            AccessLevel.SYSTEM_MODE
         );
 
         System.assertEquals(
@@ -202,7 +207,8 @@ private class VEQuotePricingIntegrityTest {
                 Discount = 0,
                 Discount_Reason__c = 'Other'
             ),
-            false
+            false,
+            AccessLevel.SYSTEM_MODE
         );
 
         System.assertEquals(
@@ -240,13 +246,14 @@ private class VEQuotePricingIntegrityTest {
         }
 
         Test.startTest();
-        insert lines;
+        insert as system lines;
         Test.stopTest();
 
         List<QuoteLineItem> actualLines = [
             SELECT Approval_Basis_Unit_Price__c
             FROM QuoteLineItem
             WHERE QuoteId = :quoteRecord.Id
+            WITH SYSTEM_MODE
         ];
 
         System.assertEquals(200, actualLines.size());
@@ -264,12 +271,13 @@ private class VEQuotePricingIntegrityTest {
         Account accountRecord = new Account(
             Name = 'Pricing Integrity Account'
         );
-        insert accountRecord;
+        insert as system accountRecord;
 
         Id pricebookId = [
         SELECT Id
         FROM Pricebook2
         WHERE Name = 'VE Pricing Integrity Test Price Book'
+        WITH SYSTEM_MODE
         LIMIT 1
         ].Id;
 
@@ -281,7 +289,7 @@ private class VEQuotePricingIntegrityTest {
             Pricebook2Id = pricebookId,
             CurrencyIsoCode = 'PLN'
         );
-        insert opportunity;
+        insert as system opportunity;
 
         Quote quoteRecord = new Quote(
             Name = 'Pricing Integrity Quote',
@@ -290,7 +298,7 @@ private class VEQuotePricingIntegrityTest {
             ExpirationDate = Date.today().addDays(30),
             CurrencyIsoCode = 'PLN'
         );
-        insert quoteRecord;
+        insert as system quoteRecord;
 
         return quoteRecord;
     }
@@ -303,6 +311,7 @@ private class VEQuotePricingIntegrityTest {
         FROM PricebookEntry
         WHERE Product2.ProductCode = 'TEST-PRICING-INTEGRITY'
         AND Pricebook2.Name = 'VE Pricing Integrity Test Price Book'
+        WITH SYSTEM_MODE
         LIMIT 1
         ];
     }
@@ -341,7 +350,7 @@ static void shouldKeepApprovalBasisImmutable() {
         Discount = 0,
         Discount_Reason__c = 'Other'
     );
-    insert line;
+    insert as system line;
 
     line = [
         SELECT
@@ -350,6 +359,7 @@ static void shouldKeepApprovalBasisImmutable() {
             Effective_Discount__c
         FROM QuoteLineItem
         WHERE Id = :line.Id
+        WITH SYSTEM_MODE
     ];
 
     System.assertEquals(
@@ -359,7 +369,7 @@ static void shouldKeepApprovalBasisImmutable() {
 
     Test.startTest();
 
-    update new QuoteLineItem(
+        update as system new QuoteLineItem(
         Id = line.Id,
         Approval_Basis_Unit_Price__c = 2000
     );
@@ -372,6 +382,7 @@ static void shouldKeepApprovalBasisImmutable() {
             Effective_Discount__c
         FROM QuoteLineItem
         WHERE Id = :line.Id
+        WITH SYSTEM_MODE
     ];
 
     System.assertEquals(

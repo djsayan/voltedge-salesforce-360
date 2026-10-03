@@ -94,6 +94,45 @@ insert noManagerSalesRep;
     );
     insert inactiveManagerSalesRep;
 
+    Id salesPermissionSetId = [
+    SELECT Id
+    FROM PermissionSet
+    WHERE Name = 'VE_Sales_User'
+    WITH SYSTEM_MODE
+    LIMIT 1
+].Id;
+
+Id approverPermissionSetId = [
+    SELECT Id
+    FROM PermissionSet
+    WHERE Name = 'VE_Commercial_Approver'
+    WITH SYSTEM_MODE
+    LIMIT 1
+].Id;
+
+insert as system new List<PermissionSetAssignment>{
+    new PermissionSetAssignment(
+        AssigneeId = salesRep.Id,
+        PermissionSetId = salesPermissionSetId
+    ),
+    new PermissionSetAssignment(
+        AssigneeId = noManagerSalesRep.Id,
+        PermissionSetId = salesPermissionSetId
+    ),
+    new PermissionSetAssignment(
+        AssigneeId = inactiveManagerSalesRep.Id,
+        PermissionSetId = salesPermissionSetId
+    ),
+    new PermissionSetAssignment(
+        AssigneeId = manager.Id,
+        PermissionSetId = approverPermissionSetId
+    ),
+    new PermissionSetAssignment(
+        AssigneeId = director.Id,
+        PermissionSetId = approverPermissionSetId
+    )
+};
+
     update new User(
         Id = inactiveManager.Id,
         IsActive = false
@@ -132,7 +171,7 @@ insert noManagerSalesRep;
                 IsActive = true,
                 Revenue_Type__c = 'One-Time'
             );
-            insert product;
+            insert as system product;
 
             Id pricebookId =
                 Test.getStandardPricebookId();
@@ -144,7 +183,7 @@ insert noManagerSalesRep;
                 CurrencyIsoCode = 'PLN',
                 IsActive = true
             );
-            insert pbe;
+            insert as system pbe;
 
             Account accountRecord = new Account(
                 Name = 'Approval Lifecycle Account'
@@ -194,6 +233,7 @@ insert noManagerSalesRep;
                     Commercial_Revision__c
                 FROM Quote
                 WHERE Id = :quoteId
+                WITH SYSTEM_MODE
             ];
 
             System.assertEquals(
@@ -256,6 +296,7 @@ insert noManagerSalesRep;
                 Commercial_Revision__c
             FROM Quote
             WHERE Id = :quoteId
+            WITH SYSTEM_MODE
         ];
 
         System.assertEquals(
@@ -322,6 +363,7 @@ insert noManagerSalesRep;
                 Commercial_Revision__c
             FROM Quote
             WHERE Id = :quoteId
+            WITH SYSTEM_MODE
         ];
 
         System.assertEquals(
@@ -354,6 +396,7 @@ insert noManagerSalesRep;
                 Discount_Approver__c
             FROM Quote
             WHERE Id = :quoteId
+            WITH SYSTEM_MODE
         ];
 
         System.assertEquals(
@@ -413,6 +456,7 @@ insert noManagerSalesRep;
                 Approval_Status__c
             FROM Quote
             WHERE Id = :quoteId
+            WITH SYSTEM_MODE
         ];
 
         System.assertEquals(
@@ -444,7 +488,7 @@ private static Quote createRoutedQuote(
         IsActive = true,
         Revenue_Type__c = 'One-Time'
     );
-    insert product;
+    insert as system product;
 
     Id pricebookId =
         Test.getStandardPricebookId();
@@ -456,7 +500,7 @@ private static Quote createRoutedQuote(
         CurrencyIsoCode = 'PLN',
         IsActive = true
     );
-    insert pbe;
+    insert as system pbe;
 
     Account accountRecord = new Account(
         Name = 'Lifecycle Account ' + suffix
@@ -501,6 +545,7 @@ private static Quote createRoutedQuote(
             Discount_Approver__c
         FROM Quote
         WHERE Id = :quoteRecord.Id
+        WITH SYSTEM_MODE
     ];
 }
 
@@ -529,6 +574,7 @@ private static Quote createApprovalReadyQuote(
             Discount_Approver__c
         FROM Quote
         WHERE Id = :quoteRecord.Id
+        WITH SYSTEM_MODE
     ];
 }
 
@@ -553,6 +599,7 @@ private static Quote createApprovalReadyQuote(
                 ProcessInstance.TargetObjectId
             FROM ProcessInstanceWorkitem
             WHERE ProcessInstance.TargetObjectId = :quoteId
+            WITH SYSTEM_MODE
             LIMIT 1
         ];
     }
@@ -607,6 +654,7 @@ static void shouldRejectQuote() {
         SELECT Status, Approval_Status__c
         FROM Quote
         WHERE Id = :quoteId
+        WITH SYSTEM_MODE
     ];
 
     System.assertEquals(
@@ -666,6 +714,7 @@ static void shouldRejectQuote() {
         SELECT Status, Approval_Status__c
         FROM Quote
         WHERE Id = :quoteId
+        WITH SYSTEM_MODE
     ];
 
     System.assertEquals(
@@ -746,6 +795,7 @@ static void shouldRouteTwentyFivePercentToCommercialDirector() {
         SELECT Status, Approval_Status__c
         FROM Quote
         WHERE Id = :quoteId
+        WITH SYSTEM_MODE
     ];
 
     System.assertEquals(
@@ -797,6 +847,7 @@ static void shouldRouteExactDiscountBoundariesCorrectly() {
             Discount_Approver__c
         FROM Quote
         WHERE Id = :quote10Id
+        WITH SYSTEM_MODE
     ];
 
     System.assertEquals(
@@ -829,6 +880,7 @@ static void shouldRouteExactDiscountBoundariesCorrectly() {
             Discount_Approver__c
         FROM Quote
         WHERE Id = :quote20Id
+        WITH SYSTEM_MODE
     ];
 
     System.assertEquals(
@@ -861,6 +913,7 @@ static void shouldRouteExactDiscountBoundariesCorrectly() {
             Discount_Approver__c
         FROM Quote
         WHERE Id = :quote30Id
+        WITH SYSTEM_MODE
     ];
 
     System.assertEquals(
