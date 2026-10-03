@@ -356,6 +356,11 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
+        <field>QuoteLineItem.Approval_Basis_Unit_Price__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
         <field>QuoteLineItem.Discount</field>
         <readable>true</readable>
     </fieldPermissions>

@@ -3,8 +3,8 @@
     <fullName>VE_Discount_Requires_Reason</fullName>
     <active>true</active>
     <errorConditionFormula>AND(
-    Discount &gt; 0,
+    Effective_Discount__c &gt; 0,
     ISPICKVAL(Discount_Reason__c, &quot;&quot;)
 )</errorConditionFormula>
-    <errorMessage>Select a Discount Reason when a discount is applied.</errorMessage>
+    <errorMessage>Select a Discount Reason when any effective discount is applied.</errorMessage>
 </ValidationRule>

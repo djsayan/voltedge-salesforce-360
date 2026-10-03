@@ -7,8 +7,9 @@
     Approval_Required__c,
     OR(
         ISBLANK(Discount_Justification__c),
-        ISBLANK(Discount_Approver__c)
+        ISBLANK(Discount_Approver__c),
+        NOT(Discount_Approver__r.IsActive)
     )
 )</errorConditionFormula>
-    <errorMessage>Discount approval requires both a justification and an assigned approver.</errorMessage>
+    <errorMessage>Discount approval requires a justification and an active assigned approver.</errorMessage>
 </ValidationRule>
