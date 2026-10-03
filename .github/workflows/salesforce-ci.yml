@@ -49,9 +49,9 @@ jobs:
         run: |
           printf '%s' "$SFDX_AUTH_URL" |
             sf org login sfdx-url \
-              --sfdx-url-stdin \
               --alias ci-devhub \
-              --set-default-dev-hub
+              --set-default-dev-hub \
+              --sfdx-url-stdin
 
       - name: Create fresh scratch org
         run: |
