@@ -66,6 +66,8 @@ public without sharing class VEQuoteLineItemHandler {
     ) {
         return currentLine.QuoteId != oldLine.QuoteId ||
             currentLine.PricebookEntryId != oldLine.PricebookEntryId ||
+            currentLine.Approval_Basis_Unit_Price__c !=
+            oldLine.Approval_Basis_Unit_Price__c ||
             currentLine.Quantity != oldLine.Quantity ||
             currentLine.UnitPrice != oldLine.UnitPrice ||
             currentLine.Discount != oldLine.Discount ||
@@ -105,7 +107,6 @@ public static void captureApprovalBasisPrice(
     }
 
     Set<Id> pricebookEntryIds = new Set<Id>();
-    Set<Id> linesNeedingSnapshot = new Set<Id>();
 
     for (QuoteLineItem line : lines) {
         if (line.PricebookEntryId == null) {
@@ -115,25 +116,29 @@ public static void captureApprovalBasisPrice(
         QuoteLineItem oldLine =
             oldMap == null ? null : oldMap.get(line.Id);
 
-        Boolean isInsert = oldLine == null;
+        Boolean isInsert =
+            oldLine == null;
 
         Boolean pricebookEntryChanged =
             oldLine != null &&
             line.PricebookEntryId != oldLine.PricebookEntryId;
 
-        Boolean missingBasis =
-            line.Approval_Basis_Unit_Price__c == null;
+        Boolean oldBasisMissing =
+            oldLine != null &&
+            oldLine.Approval_Basis_Unit_Price__c == null;
 
         if (
             isInsert ||
             pricebookEntryChanged ||
-            missingBasis
+            oldBasisMissing
         ) {
-            pricebookEntryIds.add(line.PricebookEntryId);
-
-            if (line.Id != null) {
-                linesNeedingSnapshot.add(line.Id);
-            }
+            pricebookEntryIds.add(
+                line.PricebookEntryId
+            );
+        } else {
+            // Approval basis is an immutable commercial snapshot.
+            line.Approval_Basis_Unit_Price__c =
+                oldLine.Approval_Basis_Unit_Price__c;
         }
     }
 
@@ -156,19 +161,21 @@ public static void captureApprovalBasisPrice(
         QuoteLineItem oldLine =
             oldMap == null ? null : oldMap.get(line.Id);
 
-        Boolean isInsert = oldLine == null;
+        Boolean isInsert =
+            oldLine == null;
 
         Boolean pricebookEntryChanged =
             oldLine != null &&
             line.PricebookEntryId != oldLine.PricebookEntryId;
 
-        Boolean missingBasis =
-            line.Approval_Basis_Unit_Price__c == null;
+        Boolean oldBasisMissing =
+            oldLine != null &&
+            oldLine.Approval_Basis_Unit_Price__c == null;
 
         if (
             !isInsert &&
             !pricebookEntryChanged &&
-            !missingBasis
+            !oldBasisMissing
         ) {
             continue;
         }

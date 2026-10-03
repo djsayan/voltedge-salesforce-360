@@ -8,7 +8,7 @@ Later Price Book changes do not automatically change this value.</inlineHelpText
     <label>Approval Basis Unit Price</label>
     <precision>16</precision>
     <required>false</required>
-    <scale>0</scale>
+    <scale>2</scale>
     <trackHistory>false</trackHistory>
     <type>Currency</type>
 </CustomField>

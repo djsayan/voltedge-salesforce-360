@@ -328,4 +328,62 @@ private class VEQuotePricingIntegrityTest {
             'Expected error containing: ' + expectedText
         );
     }
+    @IsTest
+static void shouldKeepApprovalBasisImmutable() {
+    Quote quoteRecord = createQuote();
+    PricebookEntry pbe = getPricebookEntry();
+
+    QuoteLineItem line = new QuoteLineItem(
+        QuoteId = quoteRecord.Id,
+        PricebookEntryId = pbe.Id,
+        Quantity = 1,
+        UnitPrice = 800,
+        Discount = 0,
+        Discount_Reason__c = 'Other'
+    );
+    insert line;
+
+    line = [
+        SELECT
+            Id,
+            Approval_Basis_Unit_Price__c,
+            Effective_Discount__c
+        FROM QuoteLineItem
+        WHERE Id = :line.Id
+    ];
+
+    System.assertEquals(
+        1000,
+        line.Approval_Basis_Unit_Price__c
+    );
+
+    Test.startTest();
+
+    update new QuoteLineItem(
+        Id = line.Id,
+        Approval_Basis_Unit_Price__c = 2000
+    );
+
+    Test.stopTest();
+
+    line = [
+        SELECT
+            Approval_Basis_Unit_Price__c,
+            Effective_Discount__c
+        FROM QuoteLineItem
+        WHERE Id = :line.Id
+    ];
+
+    System.assertEquals(
+        1000,
+        line.Approval_Basis_Unit_Price__c,
+        'Approval basis must be immutable after capture.'
+    );
+
+    System.assertEquals(
+        20,
+        line.Effective_Discount__c,
+        'Changing the snapshot directly must not change effective discount.'
+    );
+}
 }
