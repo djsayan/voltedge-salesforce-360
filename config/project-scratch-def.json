@@ -1,13 +1,30 @@
 {
-  "orgName": "Demo company",
+  "orgName": "VoltEdge Fresh CI",
   "edition": "Developer",
-  "features": ["EnableSetPasswordInApi"],
+  "description": "Disposable VoltEdge scratch org for clean deployment and CI validation.",
+  "hasSampleData": false,
+  "features": [
+    "EnableSetPasswordInApi",
+    "ServiceCloud",
+    "ServiceUser",
+    "SalesUser"
+  ],
   "settings": {
+    "currencySettings": {
+      "enableMultiCurrency": true
+    },
+    "languageSettings": {
+    "enableTranslationWorkbench": true
+    },
+    "quoteSettings": {
+      "enableQuote": true,
+      "enableQuotesWithoutOppEnabled": false
+    },
+    "omniChannelSettings": {
+      "enableOmniChannel": true
+    },
     "lightningExperienceSettings": {
       "enableS1DesktopEnabled": true
-    },
-    "mobileSettings": {
-      "enableS1EncryptedStoragePref2": false
     }
   }
 }
