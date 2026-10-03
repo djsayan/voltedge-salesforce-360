@@ -8,9 +8,9 @@ private class VEQuoteApprovalHardeningTest {
             IsActive = true,
             Revenue_Type__c = 'One-Time'
         );
-        insert product;
+        insert as system product;
         Id pricebookId = Test.getStandardPricebookId();
-        insert new PricebookEntry(
+        insert as system new PricebookEntry(
             Pricebook2Id = pricebookId,
             Product2Id = product.Id,
             UnitPrice = 1000,
@@ -25,12 +25,12 @@ private class VEQuoteApprovalHardeningTest {
         List<QuoteLineItem> lines = new List<QuoteLineItem>{
             makeLine(quoteRecord.Id, 25), makeLine(quoteRecord.Id, 5)
         };
-        insert lines;
+        insert as system lines;
         setApprovedFixture(new List<Quote>{quoteRecord});
         Decimal revision = getQuote(quoteRecord.Id).Commercial_Revision__c;
 
         Test.startTest();
-        update new QuoteLineItem(Id = lines[1].Id, Discount = 24);
+        update as system new QuoteLineItem(Id = lines[1].Id, Discount = 24);
         Test.stopTest();
 
         assertReopened(quoteRecord.Id, 25, revision + 1, 'Required');
@@ -45,7 +45,7 @@ private class VEQuoteApprovalHardeningTest {
         makeLine(quotes[1].Id, 25)
     };
 
-    insert lines;
+    insert as system lines;
 
     setApprovedFixture(quotes);
 
@@ -61,6 +61,7 @@ private class VEQuoteApprovalHardeningTest {
             PricebookEntry.UnitPrice
         FROM QuoteLineItem
         WHERE Id = :lines[1].Id
+        WITH SYSTEM_MODE
         LIMIT 1
     ];
 
@@ -69,7 +70,7 @@ private class VEQuoteApprovalHardeningTest {
 
     Test.startTest();
 
-    update new List<QuoteLineItem>{
+    update as system new List<QuoteLineItem>{
         new QuoteLineItem(
             Id = lines[0].Id,
             Quantity = 2
@@ -102,13 +103,13 @@ private class VEQuoteApprovalHardeningTest {
         List<QuoteLineItem> lines = new List<QuoteLineItem>{
             makeLine(quotes[0].Id, 25), makeLine(quotes[1].Id, 25)
         };
-        insert lines;
+        insert as system lines;
         setApprovedFixture(quotes);
         Decimal revisionA = getQuote(quotes[0].Id).Commercial_Revision__c;
         Decimal revisionB = getQuote(quotes[1].Id).Commercial_Revision__c;
 
         Test.startTest();
-        update new List<QuoteLineItem>{
+        update as system new List<QuoteLineItem>{
             new QuoteLineItem(Id = lines[0].Id, Discount_Reason__c = 'Other'),
             new QuoteLineItem(Id = lines[1].Id, ServiceDate = Date.today().addDays(7))
         };
@@ -122,12 +123,12 @@ private class VEQuoteApprovalHardeningTest {
     static void shouldPreserveApprovalForDescriptionOnly() {
         Quote quoteRecord = createQuotes(1)[0];
         QuoteLineItem line = makeLine(quoteRecord.Id, 25);
-        insert line;
+        insert as system line;
         setApprovedFixture(new List<Quote>{quoteRecord});
         Quote beforeUpdate = getQuote(quoteRecord.Id);
 
         Test.startTest();
-        update new QuoteLineItem(Id = line.Id, Description = 'Internal note');
+        update as system new QuoteLineItem(Id = line.Id, Description = 'Internal note');
         Test.stopTest();
 
         Quote actual = getQuote(quoteRecord.Id);
@@ -141,12 +142,12 @@ private class VEQuoteApprovalHardeningTest {
     static void shouldReopenPresentedQuoteBelowApprovalThreshold() {
         Quote quoteRecord = createQuotes(1)[0];
         QuoteLineItem line = makeLine(quoteRecord.Id, 5);
-        insert line;
-        update new Quote(Id = quoteRecord.Id, Status = 'Presented');
+        insert as system line;
+        update as system new Quote(Id = quoteRecord.Id, Status = 'Presented');
         Decimal revision = getQuote(quoteRecord.Id).Commercial_Revision__c;
 
         Test.startTest();
-        update new QuoteLineItem(Id = line.Id, Quantity = 2, UnitPrice = 1000);
+        update as system new QuoteLineItem(Id = line.Id, Quantity = 2, UnitPrice = 1000);
         Test.stopTest();
 
         assertReopened(quoteRecord.Id, 5, revision + 1, 'Not Required');
@@ -156,33 +157,33 @@ private class VEQuoteApprovalHardeningTest {
     static void shouldInvalidateAfterInsertDeleteAndRestore() {
         Quote quoteRecord = createQuotes(1)[0];
         QuoteLineItem initialLine = makeLine(quoteRecord.Id, 25);
-        insert initialLine;
+        insert as system initialLine;
         setApprovedFixture(new List<Quote>{quoteRecord});
         Decimal revision = getQuote(quoteRecord.Id).Commercial_Revision__c;
         QuoteLineItem extraLine = makeLine(quoteRecord.Id, 5);
 
         Test.startTest();
-        insert extraLine;
+        insert as system extraLine;
         revision += 1;
         assertReopened(quoteRecord.Id, 25, revision, 'Required');
 
         setApprovedFixture(new List<Quote>{quoteRecord});
-        delete new QuoteLineItem(Id = extraLine.Id);
+        delete as system new QuoteLineItem(Id = extraLine.Id);
         revision += 1;
         assertReopened(quoteRecord.Id, 25, revision, 'Required');
 
         if (QuoteLineItem.SObjectType.getDescribe().isUndeletable()) {
             setApprovedFixture(new List<Quote>{quoteRecord});
             QuoteLineItem deletedLine = new QuoteLineItem(Id = extraLine.Id);
-            undelete deletedLine;
+            undelete as system deletedLine;
             revision += 1;
             assertReopened(quoteRecord.Id, 25, revision, 'Required');
-            delete deletedLine;
+            delete as system deletedLine;
             revision += 1;
         }
 
         setApprovedFixture(new List<Quote>{quoteRecord});
-        delete new QuoteLineItem(Id = initialLine.Id);
+        delete as system new QuoteLineItem(Id = initialLine.Id);
         Test.stopTest();
 
         assertReopened(quoteRecord.Id, 0, revision + 1, 'Not Required');
@@ -194,27 +195,27 @@ private class VEQuoteApprovalHardeningTest {
         List<QuoteLineItem> lines = new List<QuoteLineItem>{
             makeLine(quoteRecord.Id, 25), makeLine(quoteRecord.Id, 5)
         };
-        insert lines;
-        delete new QuoteLineItem(Id = lines[1].Id);
+        insert as system lines;
+        delete as system new QuoteLineItem(Id = lines[1].Id);
         // State fixture only. Real submission/recall is covered by manual UAT.
-        update new Quote(
+        update as system new Quote(
             Id = quoteRecord.Id, Status = 'In Review', Approval_Status__c = 'Pending'
         );
         Decimal revision = getQuote(quoteRecord.Id).Commercial_Revision__c;
 
         Test.startTest();
-        Database.SaveResult insertResult = Database.insert(makeLine(quoteRecord.Id, 5), false);
+        Database.SaveResult insertResult = Database.insert(makeLine(quoteRecord.Id, 5), false,AccessLevel.SYSTEM_MODE);
         System.assertEquals(false, insertResult.isSuccess());
         assertGuardError(insertResult.getErrors());
 
         Database.SaveResult updateResult = Database.update(
-            new QuoteLineItem(Id = lines[0].Id, Description = 'Blocked note'), false
+            new QuoteLineItem(Id = lines[0].Id, Description = 'Blocked note'), false,AccessLevel.SYSTEM_MODE
         );
         System.assertEquals(false, updateResult.isSuccess());
         assertGuardError(updateResult.getErrors());
 
         Database.DeleteResult deleteResult = Database.delete(
-            new QuoteLineItem(Id = lines[0].Id), false
+            new QuoteLineItem(Id = lines[0].Id), false,AccessLevel.SYSTEM_MODE
         );
         System.assertEquals(false, deleteResult.isSuccess());
         assertGuardError(deleteResult.getErrors());
@@ -233,8 +234,8 @@ private class VEQuoteApprovalHardeningTest {
         System.assertEquals(1, [SELECT COUNT() FROM QuoteLineItem WHERE QuoteId = :quoteRecord.Id]);
 
         // No real ProcessInstance exists in this fixture, so unlock by state.
-        update new Quote(Id = quoteRecord.Id, Status = 'Draft', Approval_Status__c = 'Required');
-        update new QuoteLineItem(Id = lines[0].Id, Quantity = 2, UnitPrice = 1000);
+        update as system new Quote(Id = quoteRecord.Id, Status = 'Draft', Approval_Status__c = 'Required');
+        update as system new QuoteLineItem(Id = lines[0].Id, Quantity = 2, UnitPrice = 1000);
         Test.stopTest();
 
         assertReopened(quoteRecord.Id, 25, revision + 1, 'Required');
@@ -246,9 +247,9 @@ private class VEQuoteApprovalHardeningTest {
         List<QuoteLineItem> lines = new List<QuoteLineItem>{
             makeLine(quotes[0].Id, 25), makeLine(quotes[1].Id, 25)
         };
-        insert lines;
+        insert as system lines;
         // Test each status independently, including inconsistent legacy states.
-        update new List<Quote>{
+        update as system new List<Quote>{
             new Quote(Id = quotes[0].Id, Status = 'Draft', Approval_Status__c = 'Pending'),
             new Quote(Id = quotes[1].Id, Status = 'In Review', Approval_Status__c = 'Required')
         };
@@ -272,8 +273,8 @@ private class VEQuoteApprovalHardeningTest {
         List<QuoteLineItem> lines = new List<QuoteLineItem>{
             makeLine(quotes[0].Id, 25), makeLine(quotes[1].Id, 25)
         };
-        insert lines;
-        update new Quote(Id = quotes[0].Id, Status = 'In Review', Approval_Status__c = 'Pending');
+        insert as system lines;
+        update as system new Quote(Id = quotes[0].Id, Status = 'In Review', Approval_Status__c = 'Pending');
         Decimal revisionA = getQuote(quotes[0].Id).Commercial_Revision__c;
         Decimal revisionB = getQuote(quotes[1].Id).Commercial_Revision__c;
 
@@ -309,12 +310,15 @@ private class VEQuoteApprovalHardeningTest {
                 ));
             }
         }
-        insert lines;
+        insert as system lines;
         setApprovedFixture(quotes);
         Set<Id> quoteIds = new Map<Id, Quote>(quotes).keySet();
         Map<Id, Quote> beforeUpdate = new Map<Id, Quote>([
-            SELECT Id, Commercial_Revision__c FROM Quote WHERE Id IN :quoteIds
-        ]);
+        SELECT Id, Commercial_Revision__c
+        FROM Quote
+        WHERE Id IN :quoteIds
+        WITH SYSTEM_MODE
+    ]);
         List<QuoteLineItem> updates = new List<QuoteLineItem>();
         for (QuoteLineItem line : lines) {
             updates.add(new QuoteLineItem(
@@ -324,13 +328,20 @@ private class VEQuoteApprovalHardeningTest {
         }
 
         Test.startTest();
-        update updates;
+        update as system updates;
         Test.stopTest();
 
         List<Quote> actualQuotes = [
-            SELECT Id, Status, Approval_Status__c, Maximum_Line_Discount__c, Commercial_Revision__c
-            FROM Quote WHERE Id IN :quoteIds
-        ];
+        SELECT
+            Id,
+            Status,
+            Approval_Status__c,
+            Maximum_Line_Discount__c,
+            Commercial_Revision__c
+        FROM Quote
+        WHERE Id IN :quoteIds
+        WITH SYSTEM_MODE
+    ];
         System.assertEquals(10, actualQuotes.size());
         for (Quote actual : actualQuotes) {
             System.assertEquals(25, actual.Maximum_Line_Discount__c);
@@ -347,7 +358,7 @@ private class VEQuoteApprovalHardeningTest {
     @IsTest
     static void shouldPreserveApprovalDuringUnchangedMetricsRefresh() {
         Quote quoteRecord = createQuotes(1)[0];
-        insert makeLine(quoteRecord.Id, 25);
+        insert as system makeLine(quoteRecord.Id, 25);
         setApprovedFixture(new List<Quote>{quoteRecord});
         Decimal revision = getQuote(quoteRecord.Id).Commercial_Revision__c;
 
@@ -367,7 +378,7 @@ private class VEQuoteApprovalHardeningTest {
             CloseDate = Date.today().addDays(30),
             Pricebook2Id = Test.getStandardPricebookId(), CurrencyIsoCode = 'PLN'
         );
-        insert opp;
+        insert as system opp;
         List<Quote> quotes = new List<Quote>();
         for (Integer i = 0; i < count; i++) {
             quotes.add(new Quote(
@@ -376,7 +387,7 @@ private class VEQuoteApprovalHardeningTest {
                 ExpirationDate = Date.today().addDays(30)
             ));
         }
-        insert quotes;
+        insert as system quotes;
         return quotes;
     }
 
@@ -386,6 +397,7 @@ private class VEQuoteApprovalHardeningTest {
             WHERE Product2.ProductCode = 'TEST-APPROVAL-HARDENING'
                 AND Pricebook2Id = :Test.getStandardPricebookId()
                 AND CurrencyIsoCode = 'PLN'
+                WITH SYSTEM_MODE
             LIMIT 1
         ].Id;
     }
@@ -404,13 +416,14 @@ private class VEQuoteApprovalHardeningTest {
         for (Quote quoteRecord : quotes) {
             updates.add(new Quote(Id = quoteRecord.Id, Status = 'Approved', Approval_Status__c = 'Approved'));
         }
-        update updates;
+        update as system updates;
     }
 
     private static Quote getQuote(Id quoteId) {
         return [
             SELECT Id, Status, Approval_Status__c, Maximum_Line_Discount__c, Commercial_Revision__c
             FROM Quote WHERE Id = :quoteId
+            WITH SYSTEM_MODE
         ];
     }
 
