@@ -76,7 +76,7 @@ jobs:
             --target-org "$SCRATCH_ALIAS" \
             --wait 15
 
-            - name: Deploy complete Salesforce source
+      - name: Deploy complete Salesforce source
         shell: bash
         run: |
           set -o pipefail
