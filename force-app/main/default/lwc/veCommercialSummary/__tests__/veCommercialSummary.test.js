@@ -55,6 +55,34 @@ describe('c-ve-commercial-summary', () => {
         expect(element.shadowRoot.textContent).toContain('Approved');
         expect(element.shadowRoot.textContent).toContain('25.00%');
         expect(element.shadowRoot.textContent).toContain('3');
+
+        const approvalStatus = element.shadowRoot.querySelector('[data-testid="approval-status"]');
+        const maximumDiscount = element.shadowRoot.querySelector('[data-testid="maximum-line-discount"]');
+
+        expect(approvalStatus.classList.contains('slds-theme_success')).toBe(true);
+        expect(maximumDiscount.classList.contains('discount-critical')).toBe(true);
+    });
+
+    it('highlights approval-required discounts as warning governance states', async () => {
+        const element = createElement('c-ve-commercial-summary', {
+            is: VeCommercialSummary
+        });
+        element.recordId = '006000000000003AAA';
+        document.body.appendChild(element);
+
+        getSummary.emit({
+            ...SUMMARY_WITH_QUOTE,
+            approvalStatus: 'Required',
+            maximumLineDiscount: 18
+        });
+        await flushPromises();
+
+        const approvalStatus = element.shadowRoot.querySelector('[data-testid="approval-status"]');
+        const maximumDiscount = element.shadowRoot.querySelector('[data-testid="maximum-line-discount"]');
+
+        expect(approvalStatus.classList.contains('slds-theme_warning')).toBe(true);
+        expect(maximumDiscount.classList.contains('discount-warning')).toBe(true);
+        expect(maximumDiscount.textContent).toContain('18.00%');
     });
 
     it('renders a graceful state when the Opportunity has no Quote', async () => {
