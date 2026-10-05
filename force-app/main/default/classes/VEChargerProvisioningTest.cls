@@ -157,6 +157,7 @@ private class VEChargerProvisioningTest {
     static void transientErrorSchedulesRetry() {
         Installation_Project__c projectRecord = createProject();
         Test.setMock(HttpCalloutMock.class, new ServerErrorMock());
+        VEChargerProvisioningQueueable.chainRetries = false;
 
         Test.startTest();
         System.enqueueJob(new VEChargerProvisioningQueueable(projectRecord.Id));
@@ -246,7 +247,7 @@ private class VEChargerProvisioningTest {
         ];
         System.assertEquals('Provisioned', actual.Provisioning_Status__c);
         System.assertEquals('PRV-EXISTING', actual.External_Provisioning_Id__c);
-        System.assertEquals(null, actual.Provisioning_Attempt_Count__c);
+        System.assertEquals(0, actual.Provisioning_Attempt_Count__c);
     }
 
     @IsTest
