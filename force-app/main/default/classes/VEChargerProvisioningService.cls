@@ -51,7 +51,7 @@ public with sharing class VEChargerProvisioningService {
                         result.responseBody,
                         ResponsePayload.class
                     );
-                } catch (JSONException parsingException) {
+                } catch (Exception parsingException) {
                     result.success = false;
                     result.retryable = false;
                     result.errorMessage = 'Provisioning API returned invalid JSON: ' + parsingException.getMessage();
