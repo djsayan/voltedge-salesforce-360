@@ -5,7 +5,7 @@ private class VECommercialSummaryControllerTest {
         Id standardPricebookId = Test.getStandardPricebookId();
 
         Account accountRecord = new Account(Name = 'VE Commercial Summary Account');
-        insert accountRecord;
+        insert as system accountRecord;
 
         Opportunity opportunityRecord = new Opportunity(
             Name = 'VE Commercial Summary Opportunity',
@@ -20,7 +20,7 @@ private class VECommercialSummaryControllerTest {
             MRR__c = 1500,
             One_Time_Revenue__c = 80000
         );
-        insert opportunityRecord;
+        insert as system opportunityRecord;
 
         Quote quoteRecord = new Quote(
             Name = 'VE Commercial Summary Quote',
@@ -29,7 +29,7 @@ private class VECommercialSummaryControllerTest {
             ExpirationDate = Date.today().addDays(30),
             CurrencyIsoCode = 'USD'
         );
-        insert quoteRecord;
+        insert as system quoteRecord;
 
         Test.startTest();
         VECommercialSummaryController.CommercialSummary result =
@@ -51,7 +51,7 @@ private class VECommercialSummaryControllerTest {
     @IsTest
     static void returnsGracefulNoQuoteState() {
         Account accountRecord = new Account(Name = 'VE No Quote Account');
-        insert accountRecord;
+        insert as system accountRecord;
 
         Opportunity opportunityRecord = new Opportunity(
             Name = 'VE No Quote Opportunity',
@@ -60,7 +60,7 @@ private class VECommercialSummaryControllerTest {
             CloseDate = Date.today().addDays(30),
             CurrencyIsoCode = 'USD'
         );
-        insert opportunityRecord;
+        insert as system opportunityRecord;
 
         Test.startTest();
         VECommercialSummaryController.CommercialSummary result =
