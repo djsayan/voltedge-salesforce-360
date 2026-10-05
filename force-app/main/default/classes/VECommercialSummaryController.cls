@@ -26,6 +26,7 @@ public with sharing class VECommercialSummaryController {
             opportunityRecords
         );
         Opportunity opportunityRecord = (Opportunity) opportunityAccess.getRecords()[0];
+        Map<String, Object> opportunityFields = opportunityRecord.getPopulatedFieldsAsMap();
 
         List<Quote> quoteRecords = [
             SELECT
@@ -43,31 +44,33 @@ public with sharing class VECommercialSummaryController {
         ];
 
         Quote latestQuote;
+        Map<String, Object> quoteFields = new Map<String, Object>();
         if (!quoteRecords.isEmpty()) {
             SObjectAccessDecision quoteAccess = Security.stripInaccessible(
                 AccessType.READABLE,
                 quoteRecords
             );
             latestQuote = (Quote) quoteAccess.getRecords()[0];
+            quoteFields = latestQuote.getPopulatedFieldsAsMap();
         }
 
         CommercialSummary summary = new CommercialSummary();
-        summary.opportunityName = opportunityRecord.Name;
-        summary.currencyIsoCode = opportunityRecord.CurrencyIsoCode;
-        summary.totalContractValue = opportunityRecord.Total_Contract_Value__c;
-        summary.recurringTcv = opportunityRecord.Recurring_TCV__c;
-        summary.arr = opportunityRecord.ARR__c;
-        summary.mrr = opportunityRecord.MRR__c;
-        summary.oneTimeRevenue = opportunityRecord.One_Time_Revenue__c;
+        summary.opportunityName = (String) opportunityFields.get('Name');
+        summary.currencyIsoCode = (String) opportunityFields.get('CurrencyIsoCode');
+        summary.totalContractValue = (Decimal) opportunityFields.get('Total_Contract_Value__c');
+        summary.recurringTcv = (Decimal) opportunityFields.get('Recurring_TCV__c');
+        summary.arr = (Decimal) opportunityFields.get('ARR__c');
+        summary.mrr = (Decimal) opportunityFields.get('MRR__c');
+        summary.oneTimeRevenue = (Decimal) opportunityFields.get('One_Time_Revenue__c');
         summary.hasQuote = latestQuote != null;
 
         if (latestQuote != null) {
-            summary.quoteId = latestQuote.Id;
-            summary.quoteName = latestQuote.Name;
-            summary.quoteStatus = latestQuote.Status;
-            summary.approvalStatus = latestQuote.Approval_Status__c;
-            summary.maximumLineDiscount = latestQuote.Maximum_Line_Discount__c;
-            summary.commercialRevision = latestQuote.Commercial_Revision__c;
+            summary.quoteId = (Id) quoteFields.get('Id');
+            summary.quoteName = (String) quoteFields.get('Name');
+            summary.quoteStatus = (String) quoteFields.get('Status');
+            summary.approvalStatus = (String) quoteFields.get('Approval_Status__c');
+            summary.maximumLineDiscount = (Decimal) quoteFields.get('Maximum_Line_Discount__c');
+            summary.commercialRevision = (Decimal) quoteFields.get('Commercial_Revision__c');
         }
 
         return summary;
