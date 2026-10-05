@@ -17,6 +17,7 @@ public with sharing class VECommercialSummaryController {
                 One_Time_Revenue__c
             FROM Opportunity
             WHERE Id = :opportunityId
+            WITH SYSTEM_MODE
             LIMIT 1
         ];
 
@@ -36,6 +37,7 @@ public with sharing class VECommercialSummaryController {
                 Commercial_Revision__c
             FROM Quote
             WHERE OpportunityId = :opportunityId
+            WITH SYSTEM_MODE
             ORDER BY CreatedDate DESC, Id DESC
             LIMIT 1
         ];
