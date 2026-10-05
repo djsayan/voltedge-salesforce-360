@@ -33,9 +33,48 @@ export default class VeCommercialSummary extends LightningElement {
         return this.summary?.approvalStatus || '—';
     }
 
+    get approvalStatusClass() {
+        const status = this.summary?.approvalStatus;
+        const baseClass = 'slds-badge approval-badge';
+
+        switch (status) {
+            case 'Approved':
+                return `${baseClass} slds-theme_success`;
+            case 'Rejected':
+                return `${baseClass} slds-theme_error`;
+            case 'Required':
+            case 'Pending':
+                return `${baseClass} slds-theme_warning`;
+            case 'Not Required':
+                return `${baseClass} slds-theme_shade`;
+            default:
+                return baseClass;
+        }
+    }
+
     get maximumLineDiscountDisplay() {
         const value = this.summary?.maximumLineDiscount;
         return value === null || value === undefined ? '—' : `${Number(value).toFixed(2)}%`;
+    }
+
+    get maximumLineDiscountClass() {
+        const value = this.summary?.maximumLineDiscount;
+
+        if (value === null || value === undefined) {
+            return 'discount-value';
+        }
+
+        const numericValue = Number(value);
+
+        if (numericValue >= 25) {
+            return 'discount-value discount-critical';
+        }
+
+        if (numericValue >= 15) {
+            return 'discount-value discount-warning';
+        }
+
+        return 'discount-value';
     }
 
     get commercialRevisionDisplay() {
