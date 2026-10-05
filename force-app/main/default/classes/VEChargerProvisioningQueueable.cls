@@ -1,6 +1,9 @@
 public with sharing class VEChargerProvisioningQueueable implements Queueable, Database.AllowsCallouts {
     private static final Integer MAX_ATTEMPTS = 3;
 
+    @TestVisible
+    private static Boolean chainRetries = true;
+
     private final Id projectId;
     private final Integer attemptNumber;
 
@@ -78,7 +81,7 @@ public with sharing class VEChargerProvisioningQueueable implements Queueable, D
 
         update as system updateRecord;
 
-        if (shouldRetry) {
+        if (shouldRetry && chainRetries) {
             System.enqueueJob(
                 new VEChargerProvisioningQueueable(projectRecord.Id, attemptNumber + 1)
             );
