@@ -78,11 +78,15 @@
                             </div>
                             <div>
                                 <span class="detail-label">Approval Status</span>
-                                <span>{approvalStatusDisplay}</span>
+                                <span class={approvalStatusClass} data-testid="approval-status">
+                                    {approvalStatusDisplay}
+                                </span>
                             </div>
                             <div>
                                 <span class="detail-label">Max Line Discount</span>
-                                <span>{maximumLineDiscountDisplay}</span>
+                                <span class={maximumLineDiscountClass} data-testid="maximum-line-discount">
+                                    {maximumLineDiscountDisplay}
+                                </span>
                             </div>
                             <div>
                                 <span class="detail-label">Commercial Revision</span>
