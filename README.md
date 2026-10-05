@@ -2,7 +2,7 @@
 
 **Enterprise-style Salesforce implementation for an EV charging infrastructure company.**
 
-VoltEdge 360 is a portfolio and reference implementation designed to demonstrate how Salesforce can support the full commercial and operational lifecycle of an EV charging business — from sales and quoting through approval governance, implementation delivery, asset management, and customer support.
+VoltEdge 360 is a portfolio and reference implementation designed to demonstrate how Salesforce can support the full commercial and operational lifecycle of an EV charging business — from sales and quoting through approval governance, implementation delivery, external provisioning, asset management, and customer support.
 
 The project is built using source-driven Salesforce development practices with Git, Salesforce DX, scratch orgs, automated Apex testing, and GitHub Actions CI.
 
@@ -19,6 +19,7 @@ The project is built using source-driven Salesforce development practices with G
 | Discount governance & approval lifecycle | Implemented |
 | Revenue calculations | Implemented |
 | Delivery / installation tracking | Implemented |
+| External charger provisioning integration | Implemented |
 | Security personas | Implemented |
 | Reports & dashboards | Implemented |
 | Fresh scratch-org deployment | Implemented |
@@ -46,10 +47,11 @@ Its Salesforce implementation needs to support several connected business proces
 - route high-discount Quotes for approval
 - prevent approved commercial terms from being changed silently
 - convert won deals into installation projects
+- provision installation projects into an external charger platform
 - support deployed charging infrastructure through Service Cloud
 - provide reporting for sales and delivery teams
 
-The goal of the project is not to create a minimal demo org, but to model the kinds of governance, automation, security, testing, and deployment concerns found in a real Salesforce implementation.
+The goal of the project is not to create a minimal demo org, but to model the kinds of governance, automation, security, integration, testing, and deployment concerns found in a real Salesforce implementation.
 
 ---
 
@@ -418,6 +420,84 @@ Operations / Delivery
 
 ---
 
+# External Charger Provisioning Integration
+
+Installation Projects can be submitted from Salesforce to an external charger provisioning platform directly from the record page.
+
+The integration is intentionally asynchronous and separates UI orchestration from transport and retry logic:
+
+```text
+Operations User
+      ↓
+Send to Provisioning Quick Action
+      ↓
+VE Send to Provisioning Screen Flow
+      ↓
+VEChargerProvisioningAction
+      ↓
+VEChargerProvisioningQueueable
+      ↓
+VEChargerProvisioningService
+      ↓
+Named Credential
+      ↓
+POST /v1/installations
+      ↓
+External Charger Platform
+```
+
+Key capabilities include:
+
+- asynchronous HTTP callouts using Queueable Apex
+- Named Credential based endpoint management
+- `Idempotency-Key` header based on the Salesforce Installation Project Id
+- protection against re-provisioning a project that is already `Provisioned`
+- persisted operational status and external provisioning id
+- HTTP status, attempt count, last-attempt timestamp, and error details for supportability
+- automatic retry for `429` and `5xx` responses
+- maximum of three automatic attempts
+- permanent failure for non-retryable responses such as `400`
+- manual retry path after the automatic retry limit is exhausted
+- Dynamic Action visibility that hides `Send to Provisioning` while the request is `Queued` and after it is `Provisioned`
+
+Provisioning state is persisted on `Installation_Project__c` using fields such as:
+
+```text
+Provisioning_Status__c
+External_Provisioning_Id__c
+Provisioning_HTTP_Status__c
+Provisioning_Attempt_Count__c
+Provisioning_Last_Attempt__c
+Provisioning_Error__c
+```
+
+A transient failure follows this lifecycle:
+
+```text
+Attempt 1
+POST /v1/installations
+HTTP 500
+      ↓
+Status remains Queued
+Attempt Count = 1
+      ↓
+Automatic Queueable retry
+      ↓
+Attempt 2
+POST /v1/installations
+HTTP 201
+      ↓
+Provisioned
+External Provisioning Id stored
+Attempt Count = 2
+```
+
+The integration was also manually verified against a stateful mock endpoint with both successful retry (`500 → 201`) and retry exhaustion (`500 → 500 → 500 → Failed`) scenarios.
+
+Detailed architecture, request/response contract, retry policy, test scenarios, and troubleshooting notes are documented in [Charger Provisioning Integration](docs/charger-provisioning-integration.md).
+
+---
+
 # Service Cloud
 
 The implementation includes a Service Cloud foundation for supporting deployed EV charging infrastructure.
@@ -492,6 +572,7 @@ VoltEdge uses permission sets to represent business personas.
 | `VE_Service_User` | Service agents |
 | `VE_Operations_User` | Delivery / operations |
 | `VE_Commercial_Approver` | Commercial approvers |
+| `VE_Charger_Provisioning_User` | Users allowed to operate the charger provisioning feature |
 
 The security model separates editable commercial data from calculated or system-controlled fields.
 
@@ -502,7 +583,7 @@ Examples of protected information include:
 - revenue calculations
 - approval routing fields
 - commercial revision
-- system-generated delivery information
+- system-generated delivery and provisioning information
 
 The intent is to enforce business rules through both Salesforce security and application logic rather than relying only on UI configuration.
 
@@ -516,6 +597,7 @@ VoltEdge uses a combination of declarative automation and Apex.
 | --- | --- | --- |
 | Prevent Charging Site Account change | Flow | Protect Account / Site / Asset integrity |
 | Installation Project creation | Flow | Sales-to-delivery handoff |
+| Charger provisioning submission | Screen Flow + Invocable Apex + Queueable Apex | Submit Installation Projects to the external charger platform with retry and audit state |
 | Quote expiration default | Flow | Default commercial validity period |
 | Quote approval routing | Flow | Calculate approval requirement and approver |
 | Quote Line commercial governance | Apex Trigger / Handler | Detect pricing and commercial changes |
@@ -554,7 +636,22 @@ Revenue calculations are handled independently by:
 VEOpportunityRevenueRollupService
 ```
 
-This keeps trigger responsibilities small and makes business logic directly testable.
+The charger provisioning integration uses a separate application-service pipeline:
+
+```text
+VEChargerProvisioningAction
+        │
+        ▼
+VEChargerProvisioningQueueable
+        │
+        ▼
+VEChargerProvisioningService
+        │
+        ▼
+External REST API
+```
+
+This keeps trigger responsibilities small, separates business concerns, and makes integration behavior directly testable.
 
 ---
 
@@ -578,7 +675,7 @@ This keeps security testing meaningful while avoiding accidental dependency on a
 
 The Apex test suite covers both unit-level behavior and multi-step business lifecycle scenarios.
 
-Current fresh-org result:
+Current fresh-org baseline:
 
 ```text
 Tests Ran:         36
@@ -609,6 +706,15 @@ The test suite includes scenarios for:
 - resubmission
 - missing manager
 - inactive manager
+- successful charger provisioning
+- request payload and idempotency header validation
+- permanent client errors without retry
+- transient server errors with retry scheduling
+- retry exhaustion
+- invalid success-response JSON
+- missing external provisioning id
+- already-provisioned idempotency behavior
+- Invocable Apex submission behavior
 
 Bulk-oriented tests include scenarios such as processing 200 Quote Lines across multiple Quotes.
 
@@ -769,7 +875,7 @@ sf apex run test \
   --wait 30
 ```
 
-Expected baseline for the current implementation:
+Expected baseline for the current validated implementation:
 
 ```text
 36 tests
@@ -791,6 +897,9 @@ voltedge-salesforce-360/
 ├── config/
 │   └── project-scratch-def.json
 │
+├── docs/
+│   └── charger-provisioning-integration.md
+│
 ├── force-app/
 │   └── main/
 │       └── default/
@@ -799,10 +908,13 @@ voltedge-salesforce-360/
 │           ├── assignmentRules/
 │           ├── classes/
 │           ├── dashboards/
+│           ├── flexipages/
 │           ├── flows/
 │           ├── layouts/
+│           ├── namedCredentials/
 │           ├── objects/
 │           ├── permissionsets/
+│           ├── quickActions/
 │           ├── queues/
 │           ├── queueRoutingConfigs/
 │           ├── reports/
@@ -912,6 +1024,26 @@ Expected result:
 Installation Project created automatically
 ```
 
+## 9. External Charger Provisioning with Retry
+
+Submit a new Installation Project using `Send to Provisioning` and simulate a transient external API failure.
+
+Expected result:
+
+```text
+User action
+→ Flow submission
+→ Queued
+→ POST /v1/installations
+→ HTTP 500
+→ automatic Queueable retry
+→ HTTP 201
+→ Provisioned
+→ External Provisioning Id stored
+```
+
+The same scenario can be run with three consecutive `5xx` responses to demonstrate retry exhaustion and a final `Failed` state with manual retry available.
+
 ---
 
 # Design Decisions
@@ -939,6 +1071,18 @@ Commercially meaningful changes invalidate the decision and require review again
 System-owned calculations execute with the access needed to maintain integrity.
 
 Real business lifecycle tests continue to execute as Sales and approval personas.
+
+## Asynchronous external provisioning
+
+Provisioning is implemented through Queueable Apex rather than a synchronous screen transaction.
+
+This prevents the user experience from depending directly on external API latency and provides a natural boundary for retries, audit state, and operational recovery.
+
+## Idempotent external requests
+
+The Salesforce Installation Project Id is sent as the `Idempotency-Key` so an external platform can safely recognize repeated submissions of the same business operation.
+
+Salesforce additionally prevents a project with both `Provisioned` status and an external provisioning id from being submitted again.
 
 ## Portable scratch configuration
 
@@ -973,7 +1117,7 @@ Predictive service
 Advanced commercial analytics
 ```
 
-The current repository intentionally focuses first on a strong CRM, quoting, approval, service, security, testing, and deployment foundation.
+The current repository intentionally focuses first on a strong CRM, quoting, approval, service, integration, security, testing, and deployment foundation.
 
 ---
 
@@ -987,6 +1131,9 @@ Business rules over demo shortcuts
 Least-privilege security
 Bulk-safe Apex
 Explicit commercial governance
+Asynchronous integration design
+Idempotent external operations
+Auditable retry and failure handling
 Automated regression testing
 Reproducible environments
 CI validation on fresh orgs
@@ -1002,4 +1149,4 @@ VoltEdge 360 is a portfolio and reference implementation.
 
 VoltEdge is a fictional company and the repository contains no real customer or production data.
 
-The project is intended to demonstrate Salesforce architecture, administration, automation, Apex development, security design, testing, source control, and CI/CD practices.
+The project is intended to demonstrate Salesforce architecture, administration, automation, Apex development, integrations, security design, testing, source control, and CI/CD practices.
