@@ -2,7 +2,7 @@
 
 **Enterprise-style Salesforce implementation for an EV charging infrastructure company.**
 
-VoltEdge 360 is a portfolio and reference implementation designed to demonstrate how Salesforce can support the full commercial and operational lifecycle of an EV charging business — from sales and quoting through approval governance, implementation delivery, asset management, and customer support.
+VoltEdge 360 is a portfolio and reference implementation designed to demonstrate how Salesforce can support the full commercial and operational lifecycle of an EV charging business — from Sales Cloud and Salesforce CPQ through approval governance, implementation delivery, external provisioning, asset management, and customer support.
 
 The project is built using source-driven Salesforce development practices with Git, Salesforce DX, scratch orgs, automated Apex testing, and GitHub Actions CI.
 
@@ -15,15 +15,21 @@ The project is built using source-driven Salesforce development practices with G
 | Core CRM & EV charging data model | Implemented |
 | Sales Cloud | Implemented |
 | Service Cloud | Implemented |
+| Salesforce CPQ | Implemented |
+| CPQ Bundles & Product Rules | Implemented |
+| CPQ Pricing, Summary Variables & Discount Schedules | Implemented |
+| CPQ Pricing Waterfall & Account-Based Pricing | Implemented |
+| CPQ Quote Generation | Implemented |
 | Quote-to-Cash foundation | Implemented |
 | Discount governance & approval lifecycle | Implemented |
 | Revenue calculations | Implemented |
 | Delivery / installation tracking | Implemented |
+| External charger provisioning integration | Implemented |
 | Security personas | Implemented |
 | Reports & dashboards | Implemented |
 | Fresh scratch-org deployment | Implemented |
 | GitHub Actions CI | Implemented |
-| Advanced CPQ / Revenue Cloud | Roadmap |
+| Revenue Cloud | Roadmap |
 | Data Cloud | Roadmap |
 | Marketing automation | Roadmap |
 | AI / Agentforce | Roadmap |
@@ -39,17 +45,20 @@ Its Salesforce implementation needs to support several connected business proces
 - manage B2B customers and their charging locations
 - track deployed charging stations as Assets
 - manage EV infrastructure sales opportunities
-- configure commercial products and pricing
+- configure commercial charging packages using Salesforce CPQ
+- enforce valid product combinations through Product Rules
+- apply quantity-based and account-based pricing
 - calculate recurring and one-time revenue
-- prepare customer Quotes
+- prepare customer Quotes and generated proposals
 - control commercial discounts
 - route high-discount Quotes for approval
 - prevent approved commercial terms from being changed silently
 - convert won deals into installation projects
+- provision installation projects into an external charger platform
 - support deployed charging infrastructure through Service Cloud
 - provide reporting for sales and delivery teams
 
-The goal of the project is not to create a minimal demo org, but to model the kinds of governance, automation, security, testing, and deployment concerns found in a real Salesforce implementation.
+The goal of the project is not to create a minimal demo org, but to model the kinds of governance, automation, security, integration, testing, and deployment concerns found in a real Salesforce implementation.
 
 ---
 
@@ -191,6 +200,55 @@ USD
 The CI environment creates PLN and EUR as technical test currencies.
 
 The conversion rates used during automated CI validation are deliberately neutral technical fixtures and are **not intended to represent real production FX rates**.
+
+---
+
+# Salesforce CPQ
+
+VoltEdge includes a practical Salesforce CPQ implementation for configurable EV charging solutions.
+
+The main bundle is:
+
+```text
+VoltEdge Commercial Charging Package
+```
+
+It combines charging hardware, installation, software, and support into a governed commercial configuration.
+
+Implemented CPQ capabilities include:
+
+- configurable bundles and Product Options
+- Product Rules for technical and commercial compatibility
+- 150 kW charger dependency on Premium Installation
+- Enterprise / 24x7 Support dependency on Premium Software
+- Summary Variables for quote-level aggregation
+- `VE Charger Volume Discount` Discount Schedule
+- Price Rules
+- account-driven strategic pricing
+- Price Books and multi-currency pricing
+- pricing waterfall behavior
+- quote generation using a customer-facing proposal template
+- downstream discount governance and approval routing
+
+The pricing flow combines multiple pricing mechanisms rather than relying on one manual discount field:
+
+```text
+Price Book / List Price
+        ↓
+Quantity-based Volume Pricing
+        ↓
+Account-based Strategic Pricing
+        ↓
+Additional / Manual Discount
+        ↓
+Final Net Price
+```
+
+This allows the CPQ implementation to demonstrate both configuration and pricing behavior: product compatibility, aggregate quantity logic, structured volume discounts, customer-specific pricing, and final commercial governance.
+
+The implementation also includes practical troubleshooting experience. For example, the Summary Variable configuration required the correct CPQ-visible `Product Code` filter field, and account-driven pricing required correct handling of Salesforce field types in CPQ rule conditions and formulas.
+
+Detailed architecture, implemented rules, pricing behavior, interview talking points, and demo scenarios are documented in [Salesforce CPQ Implementation Case Study](docs/salesforce-cpq.md).
 
 ---
 
@@ -418,6 +476,84 @@ Operations / Delivery
 
 ---
 
+# External Charger Provisioning Integration
+
+Installation Projects can be submitted from Salesforce to an external charger provisioning platform directly from the record page.
+
+The integration is intentionally asynchronous and separates UI orchestration from transport and retry logic:
+
+```text
+Operations User
+      ↓
+Send to Provisioning Quick Action
+      ↓
+VE Send to Provisioning Screen Flow
+      ↓
+VEChargerProvisioningAction
+      ↓
+VEChargerProvisioningQueueable
+      ↓
+VEChargerProvisioningService
+      ↓
+Named Credential
+      ↓
+POST /v1/installations
+      ↓
+External Charger Platform
+```
+
+Key capabilities include:
+
+- asynchronous HTTP callouts using Queueable Apex
+- Named Credential based endpoint management
+- `Idempotency-Key` header based on the Salesforce Installation Project Id
+- protection against re-provisioning a project that is already `Provisioned`
+- persisted operational status and external provisioning id
+- HTTP status, attempt count, last-attempt timestamp, and error details for supportability
+- automatic retry for `429` and `5xx` responses
+- maximum of three automatic attempts
+- permanent failure for non-retryable responses such as `400`
+- manual retry path after the automatic retry limit is exhausted
+- Dynamic Action visibility that hides `Send to Provisioning` while the request is `Queued` and after it is `Provisioned`
+
+Provisioning state is persisted on `Installation_Project__c` using fields such as:
+
+```text
+Provisioning_Status__c
+External_Provisioning_Id__c
+Provisioning_HTTP_Status__c
+Provisioning_Attempt_Count__c
+Provisioning_Last_Attempt__c
+Provisioning_Error__c
+```
+
+A transient failure follows this lifecycle:
+
+```text
+Attempt 1
+POST /v1/installations
+HTTP 500
+      ↓
+Status remains Queued
+Attempt Count = 1
+      ↓
+Automatic Queueable retry
+      ↓
+Attempt 2
+POST /v1/installations
+HTTP 201
+      ↓
+Provisioned
+External Provisioning Id stored
+Attempt Count = 2
+```
+
+The integration was also manually verified against a stateful mock endpoint with both successful retry (`500 → 201`) and retry exhaustion (`500 → 500 → 500 → Failed`) scenarios.
+
+Detailed architecture, request/response contract, retry policy, test scenarios, and troubleshooting notes are documented in [Charger Provisioning Integration](docs/charger-provisioning-integration.md).
+
+---
+
 # Service Cloud
 
 The implementation includes a Service Cloud foundation for supporting deployed EV charging infrastructure.
@@ -492,6 +628,7 @@ VoltEdge uses permission sets to represent business personas.
 | `VE_Service_User` | Service agents |
 | `VE_Operations_User` | Delivery / operations |
 | `VE_Commercial_Approver` | Commercial approvers |
+| `VE_Charger_Provisioning_User` | Users allowed to operate the charger provisioning feature |
 
 The security model separates editable commercial data from calculated or system-controlled fields.
 
@@ -502,7 +639,7 @@ Examples of protected information include:
 - revenue calculations
 - approval routing fields
 - commercial revision
-- system-generated delivery information
+- system-generated delivery and provisioning information
 
 The intent is to enforce business rules through both Salesforce security and application logic rather than relying only on UI configuration.
 
@@ -516,6 +653,7 @@ VoltEdge uses a combination of declarative automation and Apex.
 | --- | --- | --- |
 | Prevent Charging Site Account change | Flow | Protect Account / Site / Asset integrity |
 | Installation Project creation | Flow | Sales-to-delivery handoff |
+| Charger provisioning submission | Screen Flow + Invocable Apex + Queueable Apex | Submit Installation Projects to the external charger platform with retry and audit state |
 | Quote expiration default | Flow | Default commercial validity period |
 | Quote approval routing | Flow | Calculate approval requirement and approver |
 | Quote Line commercial governance | Apex Trigger / Handler | Detect pricing and commercial changes |
@@ -554,7 +692,22 @@ Revenue calculations are handled independently by:
 VEOpportunityRevenueRollupService
 ```
 
-This keeps trigger responsibilities small and makes business logic directly testable.
+The charger provisioning integration uses a separate application-service pipeline:
+
+```text
+VEChargerProvisioningAction
+        │
+        ▼
+VEChargerProvisioningQueueable
+        │
+        ▼
+VEChargerProvisioningService
+        │
+        ▼
+External REST API
+```
+
+This keeps trigger responsibilities small, separates business concerns, and makes integration behavior directly testable.
 
 ---
 
@@ -578,7 +731,7 @@ This keeps security testing meaningful while avoiding accidental dependency on a
 
 The Apex test suite covers both unit-level behavior and multi-step business lifecycle scenarios.
 
-Current fresh-org result:
+Current fresh-org baseline:
 
 ```text
 Tests Ran:         36
@@ -609,6 +762,15 @@ The test suite includes scenarios for:
 - resubmission
 - missing manager
 - inactive manager
+- successful charger provisioning
+- request payload and idempotency header validation
+- permanent client errors without retry
+- transient server errors with retry scheduling
+- retry exhaustion
+- invalid success-response JSON
+- missing external provisioning id
+- already-provisioned idempotency behavior
+- Invocable Apex submission behavior
 
 Bulk-oriented tests include scenarios such as processing 200 Quote Lines across multiple Quotes.
 
@@ -769,7 +931,7 @@ sf apex run test \
   --wait 30
 ```
 
-Expected baseline for the current implementation:
+Expected baseline for the current validated implementation:
 
 ```text
 36 tests
@@ -791,6 +953,10 @@ voltedge-salesforce-360/
 ├── config/
 │   └── project-scratch-def.json
 │
+├── docs/
+│   ├── charger-provisioning-integration.md
+│   └── salesforce-cpq.md
+│
 ├── force-app/
 │   └── main/
 │       └── default/
@@ -799,10 +965,13 @@ voltedge-salesforce-360/
 │           ├── assignmentRules/
 │           ├── classes/
 │           ├── dashboards/
+│           ├── flexipages/
 │           ├── flows/
 │           ├── layouts/
+│           ├── namedCredentials/
 │           ├── objects/
 │           ├── permissionsets/
+│           ├── quickActions/
 │           ├── queues/
 │           ├── queueRoutingConfigs/
 │           ├── reports/
@@ -819,7 +988,26 @@ voltedge-salesforce-360/
 
 The implementation can be demonstrated through several end-to-end business scenarios.
 
-## 1. EV Infrastructure Sale
+## 1. CPQ Configuration and Pricing
+
+Configure the `VoltEdge Commercial Charging Package` for a strategic customer using an eligible charger quantity.
+
+Expected behavior:
+
+```text
+Bundle configuration
+→ Product Rules enforce compatible options
+→ Summary Variable aggregates eligible charger quantity
+→ VE Charger Volume Discount applies the volume tier
+→ Account-based Price Rule applies strategic pricing
+→ additional / manual discount is applied if entered
+→ final Net Price is calculated
+→ commercial discount governance evaluates the result
+```
+
+This scenario demonstrates bundle configuration, Product Options, Product Rules, Summary Variables, Discount Schedules, Price Rules, account-driven pricing, and pricing waterfall behavior.
+
+## 2. EV Infrastructure Sale
 
 ```text
 Account
@@ -831,7 +1019,7 @@ Account
 
 Demonstrates Sales Cloud, Products, Price Books, multi-currency, and revenue calculations.
 
-## 2. Standard Discount
+## 3. Standard Discount
 
 Create a Quote Line with an effective discount of 8%.
 
@@ -841,7 +1029,7 @@ Expected result:
 Approval Required: No
 ```
 
-## 3. Sales Manager Approval
+## 4. Sales Manager Approval
 
 Create a Quote with an effective discount of 15%.
 
@@ -853,7 +1041,7 @@ Approval Level: Sales Manager
 Approver: Opportunity Owner's Manager
 ```
 
-## 4. Commercial Director Approval
+## 5. Commercial Director Approval
 
 Create a Quote with an effective discount of 25%.
 
@@ -864,7 +1052,7 @@ Approval Required: Yes
 Approval Level: Commercial Director
 ```
 
-## 5. Discount Guardrail
+## 6. Discount Guardrail
 
 Attempt an effective discount above 30%.
 
@@ -874,7 +1062,7 @@ Expected result:
 Save blocked
 ```
 
-## 6. Commercial Change After Approval
+## 7. Commercial Change After Approval
 
 Approve a Quote and then change its Unit Price.
 
@@ -888,7 +1076,7 @@ Approved
 → approval required again
 ```
 
-## 7. Service Case
+## 8. Service Case
 
 Create a Case for a deployed charging station.
 
@@ -902,7 +1090,7 @@ Case
 → Service Agent
 ```
 
-## 8. Closed Won Delivery
+## 9. Closed Won Delivery
 
 Close an eligible Opportunity as Won.
 
@@ -911,6 +1099,26 @@ Expected result:
 ```text
 Installation Project created automatically
 ```
+
+## 10. External Charger Provisioning with Retry
+
+Submit a new Installation Project using `Send to Provisioning` and simulate a transient external API failure.
+
+Expected result:
+
+```text
+User action
+→ Flow submission
+→ Queued
+→ POST /v1/installations
+→ HTTP 500
+→ automatic Queueable retry
+→ HTTP 201
+→ Provisioned
+→ External Provisioning Id stored
+```
+
+The same scenario can be run with three consecutive `5xx` responses to demonstrate retry exhaustion and a final `Failed` state with manual retry available.
 
 ---
 
@@ -940,6 +1148,18 @@ System-owned calculations execute with the access needed to maintain integrity.
 
 Real business lifecycle tests continue to execute as Sales and approval personas.
 
+## Asynchronous external provisioning
+
+Provisioning is implemented through Queueable Apex rather than a synchronous screen transaction.
+
+This prevents the user experience from depending directly on external API latency and provides a natural boundary for retries, audit state, and operational recovery.
+
+## Idempotent external requests
+
+The Salesforce Installation Project Id is sent as the `Idempotency-Key` so an external platform can safely recognize repeated submissions of the same business operation.
+
+Salesforce additionally prevents a project with both `Provisioned` status and an external provisioning id from being submitted again.
+
 ## Portable scratch configuration
 
 The project uses an explicit scratch-org definition instead of depending on the configuration of one source org.
@@ -961,7 +1181,7 @@ Future iterations are intended to extend VoltEdge 360 into additional Salesforce
 Potential areas include:
 
 ```text
-Revenue Cloud / advanced CPQ
+Revenue Cloud
 Data Cloud
 Marketing automation
 Agentforce / AI
@@ -973,7 +1193,7 @@ Predictive service
 Advanced commercial analytics
 ```
 
-The current repository intentionally focuses first on a strong CRM, quoting, approval, service, security, testing, and deployment foundation.
+Salesforce CPQ is already implemented in the current portfolio scope. Revenue Cloud is tracked separately as a future platform extension rather than being used as a label for the existing CPQ implementation.
 
 ---
 
@@ -987,6 +1207,9 @@ Business rules over demo shortcuts
 Least-privilege security
 Bulk-safe Apex
 Explicit commercial governance
+Asynchronous integration design
+Idempotent external operations
+Auditable retry and failure handling
 Automated regression testing
 Reproducible environments
 CI validation on fresh orgs
@@ -1002,4 +1225,4 @@ VoltEdge 360 is a portfolio and reference implementation.
 
 VoltEdge is a fictional company and the repository contains no real customer or production data.
 
-The project is intended to demonstrate Salesforce architecture, administration, automation, Apex development, security design, testing, source control, and CI/CD practices.
+The project is intended to demonstrate Salesforce architecture, administration, Salesforce CPQ, automation, Apex development, integrations, security design, testing, source control, and CI/CD practices.
