@@ -2,7 +2,7 @@
 
 **Enterprise-style Salesforce implementation for an EV charging infrastructure company.**
 
-VoltEdge 360 is a portfolio and reference implementation designed to demonstrate how Salesforce can support the full commercial and operational lifecycle of an EV charging business — from sales and quoting through approval governance, implementation delivery, external provisioning, asset management, and customer support.
+VoltEdge 360 is a portfolio and reference implementation designed to demonstrate how Salesforce can support the full commercial and operational lifecycle of an EV charging business — from Sales Cloud and Salesforce CPQ through approval governance, implementation delivery, external provisioning, asset management, and customer support.
 
 The project is built using source-driven Salesforce development practices with Git, Salesforce DX, scratch orgs, automated Apex testing, and GitHub Actions CI.
 
@@ -15,6 +15,11 @@ The project is built using source-driven Salesforce development practices with G
 | Core CRM & EV charging data model | Implemented |
 | Sales Cloud | Implemented |
 | Service Cloud | Implemented |
+| Salesforce CPQ | Implemented |
+| CPQ Bundles & Product Rules | Implemented |
+| CPQ Pricing, Summary Variables & Discount Schedules | Implemented |
+| CPQ Pricing Waterfall & Account-Based Pricing | Implemented |
+| CPQ Quote Generation | Implemented |
 | Quote-to-Cash foundation | Implemented |
 | Discount governance & approval lifecycle | Implemented |
 | Revenue calculations | Implemented |
@@ -24,7 +29,7 @@ The project is built using source-driven Salesforce development practices with G
 | Reports & dashboards | Implemented |
 | Fresh scratch-org deployment | Implemented |
 | GitHub Actions CI | Implemented |
-| Advanced CPQ / Revenue Cloud | Roadmap |
+| Revenue Cloud | Roadmap |
 | Data Cloud | Roadmap |
 | Marketing automation | Roadmap |
 | AI / Agentforce | Roadmap |
@@ -40,9 +45,11 @@ Its Salesforce implementation needs to support several connected business proces
 - manage B2B customers and their charging locations
 - track deployed charging stations as Assets
 - manage EV infrastructure sales opportunities
-- configure commercial products and pricing
+- configure commercial charging packages using Salesforce CPQ
+- enforce valid product combinations through Product Rules
+- apply quantity-based and account-based pricing
 - calculate recurring and one-time revenue
-- prepare customer Quotes
+- prepare customer Quotes and generated proposals
 - control commercial discounts
 - route high-discount Quotes for approval
 - prevent approved commercial terms from being changed silently
@@ -193,6 +200,55 @@ USD
 The CI environment creates PLN and EUR as technical test currencies.
 
 The conversion rates used during automated CI validation are deliberately neutral technical fixtures and are **not intended to represent real production FX rates**.
+
+---
+
+# Salesforce CPQ
+
+VoltEdge includes a practical Salesforce CPQ implementation for configurable EV charging solutions.
+
+The main bundle is:
+
+```text
+VoltEdge Commercial Charging Package
+```
+
+It combines charging hardware, installation, software, and support into a governed commercial configuration.
+
+Implemented CPQ capabilities include:
+
+- configurable bundles and Product Options
+- Product Rules for technical and commercial compatibility
+- 150 kW charger dependency on Premium Installation
+- Enterprise / 24x7 Support dependency on Premium Software
+- Summary Variables for quote-level aggregation
+- `VE Charger Volume Discount` Discount Schedule
+- Price Rules
+- account-driven strategic pricing
+- Price Books and multi-currency pricing
+- pricing waterfall behavior
+- quote generation using a customer-facing proposal template
+- downstream discount governance and approval routing
+
+The pricing flow combines multiple pricing mechanisms rather than relying on one manual discount field:
+
+```text
+Price Book / List Price
+        ↓
+Quantity-based Volume Pricing
+        ↓
+Account-based Strategic Pricing
+        ↓
+Additional / Manual Discount
+        ↓
+Final Net Price
+```
+
+This allows the CPQ implementation to demonstrate both configuration and pricing behavior: product compatibility, aggregate quantity logic, structured volume discounts, customer-specific pricing, and final commercial governance.
+
+The implementation also includes practical troubleshooting experience. For example, the Summary Variable configuration required the correct CPQ-visible `Product Code` filter field, and account-driven pricing required correct handling of Salesforce field types in CPQ rule conditions and formulas.
+
+Detailed architecture, implemented rules, pricing behavior, interview talking points, and demo scenarios are documented in [Salesforce CPQ Implementation Case Study](docs/salesforce-cpq.md).
 
 ---
 
@@ -898,7 +954,8 @@ voltedge-salesforce-360/
 │   └── project-scratch-def.json
 │
 ├── docs/
-│   └── charger-provisioning-integration.md
+│   ├── charger-provisioning-integration.md
+│   └── salesforce-cpq.md
 │
 ├── force-app/
 │   └── main/
@@ -931,7 +988,26 @@ voltedge-salesforce-360/
 
 The implementation can be demonstrated through several end-to-end business scenarios.
 
-## 1. EV Infrastructure Sale
+## 1. CPQ Configuration and Pricing
+
+Configure the `VoltEdge Commercial Charging Package` for a strategic customer using an eligible charger quantity.
+
+Expected behavior:
+
+```text
+Bundle configuration
+→ Product Rules enforce compatible options
+→ Summary Variable aggregates eligible charger quantity
+→ VE Charger Volume Discount applies the volume tier
+→ Account-based Price Rule applies strategic pricing
+→ additional / manual discount is applied if entered
+→ final Net Price is calculated
+→ commercial discount governance evaluates the result
+```
+
+This scenario demonstrates bundle configuration, Product Options, Product Rules, Summary Variables, Discount Schedules, Price Rules, account-driven pricing, and pricing waterfall behavior.
+
+## 2. EV Infrastructure Sale
 
 ```text
 Account
@@ -943,7 +1019,7 @@ Account
 
 Demonstrates Sales Cloud, Products, Price Books, multi-currency, and revenue calculations.
 
-## 2. Standard Discount
+## 3. Standard Discount
 
 Create a Quote Line with an effective discount of 8%.
 
@@ -953,7 +1029,7 @@ Expected result:
 Approval Required: No
 ```
 
-## 3. Sales Manager Approval
+## 4. Sales Manager Approval
 
 Create a Quote with an effective discount of 15%.
 
@@ -965,7 +1041,7 @@ Approval Level: Sales Manager
 Approver: Opportunity Owner's Manager
 ```
 
-## 4. Commercial Director Approval
+## 5. Commercial Director Approval
 
 Create a Quote with an effective discount of 25%.
 
@@ -976,7 +1052,7 @@ Approval Required: Yes
 Approval Level: Commercial Director
 ```
 
-## 5. Discount Guardrail
+## 6. Discount Guardrail
 
 Attempt an effective discount above 30%.
 
@@ -986,7 +1062,7 @@ Expected result:
 Save blocked
 ```
 
-## 6. Commercial Change After Approval
+## 7. Commercial Change After Approval
 
 Approve a Quote and then change its Unit Price.
 
@@ -1000,7 +1076,7 @@ Approved
 → approval required again
 ```
 
-## 7. Service Case
+## 8. Service Case
 
 Create a Case for a deployed charging station.
 
@@ -1014,7 +1090,7 @@ Case
 → Service Agent
 ```
 
-## 8. Closed Won Delivery
+## 9. Closed Won Delivery
 
 Close an eligible Opportunity as Won.
 
@@ -1024,7 +1100,7 @@ Expected result:
 Installation Project created automatically
 ```
 
-## 9. External Charger Provisioning with Retry
+## 10. External Charger Provisioning with Retry
 
 Submit a new Installation Project using `Send to Provisioning` and simulate a transient external API failure.
 
@@ -1105,7 +1181,7 @@ Future iterations are intended to extend VoltEdge 360 into additional Salesforce
 Potential areas include:
 
 ```text
-Revenue Cloud / advanced CPQ
+Revenue Cloud
 Data Cloud
 Marketing automation
 Agentforce / AI
@@ -1117,7 +1193,7 @@ Predictive service
 Advanced commercial analytics
 ```
 
-The current repository intentionally focuses first on a strong CRM, quoting, approval, service, integration, security, testing, and deployment foundation.
+Salesforce CPQ is already implemented in the current portfolio scope. Revenue Cloud is tracked separately as a future platform extension rather than being used as a label for the existing CPQ implementation.
 
 ---
 
@@ -1149,4 +1225,4 @@ VoltEdge 360 is a portfolio and reference implementation.
 
 VoltEdge is a fictional company and the repository contains no real customer or production data.
 
-The project is intended to demonstrate Salesforce architecture, administration, automation, Apex development, integrations, security design, testing, source control, and CI/CD practices.
+The project is intended to demonstrate Salesforce architecture, administration, Salesforce CPQ, automation, Apex development, integrations, security design, testing, source control, and CI/CD practices.
